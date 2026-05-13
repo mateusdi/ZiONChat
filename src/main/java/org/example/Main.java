@@ -14,6 +14,8 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javax.crypto.Cipher;
@@ -21,11 +23,13 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.*;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 
 public class Main extends Application {
-    private static final String HOST = "10.110.71.48";
-    private static final int PORT = 5555;
+    private String host = "10.110.71.48";
+    private int port = 5555;
     private static final String SECRET_KEY = "TheMatrixHasYou!";
 
     private TextArea chat = new TextArea();
@@ -38,36 +42,69 @@ public class Main extends Application {
     private BufferedReader in;
     private Stage loginStage;
 
+    private boolean notificationsEnabled = true;
     private final int fontSize = 16;
     private int[] drops;
-
-    // Caracteres originais: Katakana (receita de sushi) + Números
     private final String matrixChars = "0123456789ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ";
 
     @Override
     public void start(Stage stage) {
+        loadConfig(); // Carrega IP/Porta do txt
         setupMainUI(stage);
+
+        stage.setOnCloseRequest(e -> {
+            try { if (socket != null) socket.close(); } catch (IOException ex) {}
+            Platform.exit();
+            System.exit(0);
+        });
+
         new Thread(() -> {
             if (connectToServer()) {
                 Platform.runLater(() -> showLoginWindow(stage));
             } else {
-                Platform.runLater(() -> chat.appendText("[!] Zion Offline. Verifique o servidor.\n"));
+                Platform.runLater(() -> chat.appendText("[!] Zion Offline em " + host + ":" + port + ". Verifique o config.txt.\n"));
             }
         }).start();
+    }
+
+    // Carrega IP e Porta de um arquivo txt
+    private void loadConfig() {
+        try {
+            File f = new File("config.txt");
+            if (!f.exists()) {
+                Files.write(Paths.get("config.txt"), "10.110.71.48:5555".getBytes());
+            }
+            String content = new String(Files.readAllBytes(Paths.get("config.txt"))).trim();
+            String[] parts = content.split(":");
+            this.host = parts[0];
+            this.port = Integer.parseInt(parts[1]);
+        } catch (Exception e) {
+            System.err.println("Erro ao carregar config.txt, usando padrões.");
+        }
+    }
+
+    // Salva/Carrega o último usuário
+    private String getLastUser() {
+        try {
+            File f = new File("lastuser.txt");
+            if (f.exists()) return new String(Files.readAllBytes(Paths.get("lastuser.txt"))).trim();
+        } catch (Exception e) {}
+        return "User_" + new Random().nextInt(999);
+    }
+
+    private void saveLastUser(String name) {
+        try { Files.write(Paths.get("lastuser.txt"), name.getBytes()); } catch (Exception e) {}
     }
 
     private void setupMainUI(Stage stage) {
         applyMatrixStyle("#003300");
         chat.setEditable(false);
-        input.setPromptText("");
-
         Canvas canvas = new Canvas(800, 500);
         GraphicsContext gc = canvas.getGraphicsContext2D();
-        int columns = (int) (800 / fontSize) + 5;
-        drops = new int[columns];
+        drops = new int[(int) (800 / fontSize) + 5];
         Arrays.fill(drops, 1);
 
-        AnimationTimer timer = new AnimationTimer() {
+        new AnimationTimer() {
             private long lastUpdate = 0;
             @Override
             public void handle(long now) {
@@ -76,23 +113,23 @@ public class Main extends Application {
                     lastUpdate = now;
                 }
             }
-        };
-        timer.start();
+        }.start();
 
         input.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
-            if (e.getCode() == KeyCode.TAB) {
-                handleTabComplete();
-                e.consume();
-            } else if (e.getCode() == KeyCode.UP) {
-                navigateHistory(true);
-            } else if (e.getCode() == KeyCode.DOWN) {
-                navigateHistory(false);
-            }
+            if (e.getCode() == KeyCode.TAB) { handleTabComplete(); e.consume(); }
+            else if (e.getCode() == KeyCode.UP) { navigateHistory(true); }
+            else if (e.getCode() == KeyCode.DOWN) { navigateHistory(false); }
         });
 
         input.setOnAction(e -> {
             String t = input.getText().trim();
             if (t.isEmpty()) return;
+            if (t.equalsIgnoreCase("/notif")) {
+                notificationsEnabled = !notificationsEnabled;
+                chat.appendText("[SISTEMA] Notificações: " + (notificationsEnabled ? "ON" : "OFF") + "\n");
+                input.clear();
+                return;
+            }
             history.add(t);
             historyIndex = -1;
             input.clear();
@@ -102,62 +139,21 @@ public class Main extends Application {
         StackPane rootStack = new StackPane();
         BorderPane uiOverlay = new BorderPane();
         uiOverlay.setPadding(new Insets(15));
-
         VBox centerBox = new VBox(10);
         VBox.setVgrow(chat, Priority.ALWAYS);
         centerBox.getChildren().addAll(chat, input);
         uiOverlay.setCenter(centerBox);
-
         VBox side = new VBox(5, new Label(" ONLINE"), usersList);
         side.setPadding(new Insets(0, 0, 0, 10));
-        side.setStyle("-fx-text-fill: #00ff00; -fx-font-family: 'Consolas';");
         uiOverlay.setRight(side);
-
         rootStack.getChildren().addAll(canvas, uiOverlay);
         rootStack.setStyle("-fx-background-color: black;");
 
         canvas.widthProperty().bind(stage.widthProperty());
         canvas.heightProperty().bind(stage.heightProperty());
-        canvas.widthProperty().addListener(ov -> {
-            drops = new int[(int)(canvas.getWidth()/fontSize) + 5];
-            Arrays.fill(drops, 1);
-        });
-
         stage.setScene(new Scene(rootStack, 800, 500));
         stage.setTitle("ZiON TERMINAL");
         stage.show();
-    }
-
-    private void drawMatrixEffect(GraphicsContext gc, double w, double h) {
-        // 1. Aplica uma camada preta semi-transparente para criar o rastro de desfoque
-        gc.setFill(Color.color(0, 0, 0, 0.15));
-        gc.fillRect(0, 0, w, h);
-
-        gc.setFont(new Font("Consolas", fontSize));
-        Random rand = new Random();
-
-        for (int i = 0; i < drops.length; i++) {
-            // Escolhe um caractere aleatório (Katakana/Sushi)
-            char text = matrixChars.charAt(rand.nextInt(matrixChars.length()));
-
-            // --- LÓGICA DE COR CORRIGIDA ---
-
-            // 2. Desenha o rastro (o caractere que ficou para trás) em VERDE
-            // Isso garante que o rastro não fique branco
-            gc.setFill(Color.web("#00ff00"));
-            gc.fillText(String.valueOf(text), i * fontSize, (drops[i] - 1) * fontSize);
-
-            // 3. Desenha a "cabeça" da gota em BRANCO/VERDE CLARO
-            gc.setFill(Color.web("#ccffcc"));
-            gc.fillText(String.valueOf(text), i * fontSize, drops[i] * fontSize);
-
-            // Reinicia a gota aleatoriamente ao chegar no fim da tela
-            if (drops[i] * fontSize > h && Math.random() > 0.975) {
-                drops[i] = 0;
-            }
-
-            drops[i]++;
-        }
     }
 
     private void handleTabComplete() {
@@ -165,24 +161,21 @@ public class Main extends Application {
         if (text.isEmpty()) return;
         String[] words = text.split(" ");
         String lastWord = words[words.length - 1];
-        String searchPrefix = lastWord.startsWith("@") ? lastWord.substring(1) : lastWord;
-
-        Optional<String> match = usersList.getItems().stream()
-                .filter(u -> u.toLowerCase().startsWith(searchPrefix.toLowerCase())).findFirst();
-
-        if (match.isPresent()) {
-            String prefix = lastWord.startsWith("@") ? "@" : "";
-            words[words.length - 1] = prefix + match.get();
-            input.setText(String.join(" ", words) + " ");
-            input.positionCaret(input.getText().length());
-        }
+        String searchPrefix = lastWord.startsWith("/") ? lastWord.substring(1) : lastWord;
+        usersList.getItems().stream()
+                .filter(u -> u.toLowerCase().startsWith(searchPrefix.toLowerCase())).findFirst()
+                .ifPresent(match -> {
+                    String prefix = lastWord.startsWith("/") ? "/" : "";
+                    words[words.length - 1] = prefix + match;
+                    input.setText(String.join(" ", words) + " ");
+                    input.positionCaret(input.getText().length());
+                });
     }
 
     private void navigateHistory(boolean up) {
         if (history.isEmpty()) return;
         if (up) { if (historyIndex < history.size() - 1) historyIndex++; }
         else { if (historyIndex > -1) historyIndex--; }
-
         if (historyIndex == -1) input.clear();
         else {
             input.setText(history.get(history.size() - 1 - historyIndex));
@@ -190,22 +183,31 @@ public class Main extends Application {
         }
     }
 
+    private void playAlertSound() {
+        if (!notificationsEnabled) return;
+        try {
+            File file = new File("alert.mp3");
+            if (file.exists()) {
+                new MediaPlayer(new Media(file.toURI().toString())).play();
+            }
+        } catch (Exception e) {}
+    }
+
     private void handle(String m) {
         if (m.equals("SYS|JOIN_SUCCESS")) {
             if (loginStage != null) loginStage.close();
             input.requestFocus();
             chat.appendText(">>> BEM-VINDO À REDE ZION.\n");
-            chat.appendText(">>> Digite /help para listar comandos disponíveis.\n\n");
-        }
-        else if (m.equals("SYS|ARCHITECT_MODE_ON")) {
+        } else if (m.equals("SYS|FAH")) {
+            playAlertSound();
+            chat.appendText("[ALERTA] ATENÇÃO SOLICITADA PELO AGENTE!\n");
+        } else if (m.equals("SYS|ARCHITECT_MODE_ON")) {
             applyMatrixStyle("#FF0000");
             chat.appendText(">>> ACESSO DE AGENTE CONFIRMADO.\n");
-        }
-        else if (m.equals("SYS|ARCHITECT_MODE_OFF")) {
+        } else if (m.equals("SYS|ARCHITECT_MODE_OFF")) {
             applyMatrixStyle("#003300");
-            chat.appendText(">>> STATUS: PRIVILÉGIOS REVOGADOS. VOLTANDO AO NORMAL.\n");
-        }
-        else if (m.startsWith("USERS|")) {
+            chat.appendText(">>> STATUS: PRIVILÉGIOS REVOGADOS.\n");
+        } else if (m.startsWith("USERS|")) {
             usersList.getItems().clear();
             for (String u : m.substring(6).split(",")) if(!u.isEmpty()) usersList.getItems().add(u);
         } else if (m.startsWith("MSG|")) {
@@ -216,22 +218,34 @@ public class Main extends Application {
         }
     }
 
-    private void applyMatrixStyle(String borderColor) {
-        style(chat, borderColor);
-        style(usersList, borderColor);
-        style(input, borderColor);
+    private void drawMatrixEffect(GraphicsContext gc, double w, double h) {
+        gc.setFill(Color.color(0, 0, 0, 0.15));
+        gc.fillRect(0, 0, w, h);
+        gc.setFont(new Font("Consolas", fontSize));
+        Random rand = new Random();
+        for (int i = 0; i < drops.length; i++) {
+            char text = matrixChars.charAt(rand.nextInt(matrixChars.length()));
+            gc.setFill(Color.web("#00ff00"));
+            gc.fillText(String.valueOf(text), i * fontSize, (drops[i] - 1) * fontSize);
+            gc.setFill(Color.web("#ccffcc"));
+            gc.fillText(String.valueOf(text), i * fontSize, drops[i] * fontSize);
+            if (drops[i] * fontSize > h && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+        }
+    }
+
+    private void applyMatrixStyle(String bc) {
+        style(chat, bc); style(usersList, bc); style(input, bc);
     }
 
     private void style(Control c, String bc) {
-        c.setStyle("-fx-control-inner-background: rgba(0, 20, 0, 0.7); " +
-                "-fx-text-fill: #00ff00; -fx-font-family: 'Consolas'; " +
-                "-fx-background-color: transparent; -fx-border-color: " + bc + "; -fx-border-width: 2; " +
-                "-fx-padding: 5 2 5 2;");
+        c.setStyle("-fx-control-inner-background: rgba(0, 20, 0, 0.7); -fx-text-fill: #00ff00; -fx-font-family: 'Consolas'; " +
+                "-fx-background-color: transparent; -fx-border-color: " + bc + "; -fx-border-width: 2; -fx-padding: 5;");
     }
 
     private boolean connectToServer() {
         try {
-            socket = new Socket(HOST, PORT);
+            socket = new Socket(host, port);
             in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
             out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"), true);
             new Thread(() -> {
@@ -253,10 +267,23 @@ public class Main extends Application {
         loginStage.initOwner(owner);
         VBox layout = new VBox(10); layout.setAlignment(Pos.CENTER); layout.setPadding(new Insets(20));
         layout.setStyle("-fx-background-color: black; -fx-border-color: #00ff00;");
-        TextField nf = new TextField("User_" + new Random().nextInt(999));
+
+        TextField nf = new TextField(getLastUser()); // Carrega último usuário
         nf.setStyle("-fx-background-color: #001100; -fx-text-fill: #00ff00; -fx-font-family: 'Consolas';");
+
         Button b = new Button("CONECTAR");
-        b.setOnAction(e -> { if(!nf.getText().trim().isEmpty()){ send("JOIN|"+nf.getText().trim()); b.setDisable(true); } });
+        Runnable loginAction = () -> {
+            String name = nf.getText().trim();
+            if(!name.isEmpty()){
+                saveLastUser(name); // Salva para a próxima vez
+                send("JOIN|"+name);
+                b.setDisable(true);
+                nf.setDisable(true);
+            }
+        };
+        b.setOnAction(e -> loginAction.run());
+        nf.setOnAction(e -> loginAction.run());
+
         layout.getChildren().addAll(new Label("CODINOME:"), nf, b);
         loginStage.setScene(new Scene(layout, 300, 150));
         loginStage.show();

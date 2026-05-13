@@ -1,0 +1,34 @@
+
+b
+java:S11924"GDefine a constant instead of duplicating this literal "[LOG] " 4 times.(ºñªóøÿÿÿÿ
+=
+java:S2189""Add an end condition to this loop.(˜ïˆÿÿÿÿÿ
+>
+java:S1148"#Use a logger to log this exception.(àºçÍşÿÿÿÿ
+S	java:S106"9Replace this use of System.out or System.err by a logger.(ÁË„ºşÿÿÿÿ
+N	java:S106"9Replace this use of System.out or System.err by a logger.(Ç€†
+m
+java:S3776'"RRefactor this method to reduce its Cognitive Complexity from 23 to the 15 allowed.(âåÜ¬úÿÿÿÿ
+N	java:S106/"9Replace this use of System.out or System.err by a logger.(Óà™Å
+S	java:S1064"9Replace this use of System.out or System.err by a logger.(ºñªóøÿÿÿÿ
+S	java:S1065"9Replace this use of System.out or System.err by a logger.(…íÇâÿÿÿÿÿ
+S	java:S106:"9Replace this use of System.out or System.err by a logger.(ë Ï¸şÿÿÿÿ
+S	java:S106@"9Replace this use of System.out or System.err by a logger.(Õ˜´‚úÿÿÿÿ
+S	java:S106F"9Replace this use of System.out or System.err by a logger.(äú”ıûÿÿÿÿ
+N	java:S106U"9Replace this use of System.out or System.err by a logger.(ªÉñ‘
+N	java:S106Y"9Replace this use of System.out or System.err by a logger.(‹®àı
+g
+java:S1450f"QRemove the "in" field and declare it as a local variable in the relevant methods.(»ğ¶ü
+C	java:S108u")Either remove or fill this block of code.(ãŸ¨£üÿÿÿÿ
+h
+java:S3776z"RRefactor this method to reduce its Cognitive Complexity from 28 to the 15 allowed.(“–ış
+T
+java:S4719|"9Replace charset name argument with StandardCharsets.UTF_8(ç­¤¸ûÿÿÿÿ
+T
+java:S4719}"9Replace charset name argument with StandardCharsets.UTF_8(òş÷Áûÿÿÿÿ
+T	java:S106"9Replace this use of System.out or System.err by a logger.(˜ö†ßıÿÿÿÿ
+?	java:S108")Either remove or fill this block of code.(”ı¾
+E
+java:S2093{"*Change this "try" to a try-with-resources.(¡»¢üùÿÿÿÿ
+P
+java:S1118¥":Add a private constructor to hide the implicit public one.(¹îş
