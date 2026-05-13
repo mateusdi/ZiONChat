@@ -46,15 +46,27 @@ public class ChatServer {
         }
     }
 
+    // Substitua o seu método loadList por este mais robusto
     private static void loadList(String fileName, Set<String> targetSet) {
         File f = new File(fileName);
-        if (!f.exists()) return;
+        if (!f.exists()) {
+            try {
+                f.createNewFile(); // Garante que o arquivo existe para futuras gravações
+                System.out.println("[INFO] Arquivo criado: " + fileName);
+            } catch (IOException e) {
+                System.out.println("[!] Erro crítico: Sem permissão para criar " + fileName);
+            }
+            return;
+        }
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
             String line;
             while ((line = br.readLine()) != null) {
                 if (!line.trim().isEmpty()) targetSet.add(line.trim());
             }
-        } catch (IOException e) { System.out.println("[!] Erro ao carregar " + fileName); }
+            System.out.println("[LOG] " + fileName + " carregado. Itens: " + targetSet.size());
+        } catch (IOException e) {
+            System.out.println("[!] Erro ao ler " + fileName);
+        }
     }
 
     private static void saveList(String fileName, Set<String> sourceSet) {
