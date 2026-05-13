@@ -1,28 +1,33 @@
 
+h
+java:S1192I"KDefine a constant instead of duplicating this literal "config.txt" 3 times.(ğÊ®±8Ö§ï“â3
+o
+java:S1192Y"MDefine a constant instead of duplicating this literal "lastuser.txt" 3 times.(ø©§¿ùÿÿÿÿ8Ö§ï“â3
+k
+java:S2184å"HCast one of the operands of this multiplication operation to a "double".(ìöüÜùÿÿÿÿ8Ö§ï“â3
+k
+java:S2184å"HCast one of the operands of this multiplication operation to a "double".(ìöüÜùÿÿÿÿ8Ö§ï“â3
+k
+java:S2184ç"HCast one of the operands of this multiplication operation to a "double".(üÙˆ¿úÿÿÿÿ8Ö§ï“â3
+k
+java:S2184ç"HCast one of the operands of this multiplication operation to a "double".(üÙˆ¿úÿÿÿÿ8Ö§ï“â3
 n
-java:S1450("QRemove the "in" field and declare it as a local variable in the relevant methods.(»ğ¶ü8İº§“â3
-k
-java:S2184Õ"HCast one of the operands of this multiplication operation to a "double".(ìöüÜùÿÿÿÿ8ÎÒ×“â3
-k
-java:S2184Õ"HCast one of the operands of this multiplication operation to a "double".(ìöüÜùÿÿÿÿ8ÎÒ×“â3
-k
-java:S2184×"HCast one of the operands of this multiplication operation to a "double".(üÙˆ¿úÿÿÿÿ8ÎÒ×“â3
-k
-java:S2184×"HCast one of the operands of this multiplication operation to a "double".(üÙˆ¿úÿÿÿÿ8ÎÒ×“â3
+java:S1450*"QRemove the "in" field and declare it as a local variable in the relevant methods.(»ğ¶ü8Ö§ï“â3
 C
-java:S1170,"!Make this final field static too.(ï÷ûÿÿÿÿ8ÎÒ×“â3
+java:S1170."!Make this final field static too.(ï÷ûÿÿÿÿ8Ö§ï“â3
 >
-java:S1170."!Make this final field static too.(Ö°ğ8ÎÒ×“â3
-E	java:S1086")Either remove or fill this block of code.(§îˆ8ÎÒ×“â3
-t
-java:S3776D"RRefactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed.(íÒ±¸úÿÿÿÿ8ÎÒ×“â3
-B
-java:S1905J"&Remove this unnecessary cast to "int".(Ù¦Ÿ8ÎÒ×“â3
-K	java:S108µ")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8ÎÒ×“â3
+java:S11700"!Make this final field static too.(Ö°ğ8Ö§ï“â3
+E	java:S1088")Either remove or fill this block of code.(§îˆ8Ö§ï“â3
+U	java:S106R"9Replace this use of System.out or System.err by a logger.(îö Œ8Ö§ï“â3
+J	java:S108[")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8Ö§ï“â3
+J	java:S108`")Either remove or fill this block of code.(ûƒÏ©øÿÿÿÿ8Ö§ï“â3
+H
+java:S1905h"&Remove this unnecessary cast to "int".(Ö¡à…ùÿÿÿÿ8Ö§ï“â3
+K	java:S108Á")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8Ö§ï“â3
 A
-java:S2119Ñ"Save and re-use this "Random".(šŸ«íøÿÿÿÿ8ÎÒ×“â3
+java:S2119á"Save and re-use this "Random".(šŸ«íøÿÿÿÿ8Ö§ï“â3
 \
-java:S4719ã"9Replace charset name argument with StandardCharsets.UTF_8(ç­¤¸ûÿÿÿÿ8ÎÒ×“â3
+java:S4719ù"9Replace charset name argument with StandardCharsets.UTF_8(ç­¤¸ûÿÿÿÿ8Ö§ï“â3
 \
-java:S4719ä"9Replace charset name argument with StandardCharsets.UTF_8(òş÷Áûÿÿÿÿ8ÎÒ×“â3
-K	java:S108ì")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8ÎÒ×“â3
+java:S4719ú"9Replace charset name argument with StandardCharsets.UTF_8(òş÷Áûÿÿÿÿ8Ö§ï“â3
+K	java:S108‚")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8Ö§ï“â3

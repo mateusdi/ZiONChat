@@ -14,7 +14,7 @@ public class ChatServer {
     private static final String SECRET_KEY = "TheMatrixHasYou!";
     private static final Map<String, ClientHandler> clients = new ConcurrentHashMap<>();
     private static final Set<String> banList = ConcurrentHashMap.newKeySet();
-    private static final Set<String> adminIPs = ConcurrentHashMap.newKeySet(); // Lista de IPs Admins
+    private static final Set<String> adminIPs = ConcurrentHashMap.newKeySet();
     private static final Map<String, Long> lastFahTime = new ConcurrentHashMap<>();
 
     private static final String BANS_FILE = "bans.txt";
@@ -36,37 +36,30 @@ public class ChatServer {
         } catch (IOException e) { e.printStackTrace(); }
     }
 
-    // --- PERSISTÊNCIA DE DADOS ---
     private static void loadConfig() {
         File f = new File("server_config.txt");
         if (f.exists()) {
             try (BufferedReader br = new BufferedReader(new FileReader(f))) {
                 PORT = Integer.parseInt(br.readLine().trim());
-            } catch (Exception e) { System.out.println("[!] Erro config. Porta 5555."); }
+            } catch (Exception e) {
+                System.out.println("[!] Erro ao ler server_config.txt. Usando porta 5555.");
+            }
+        } else {
+            try (PrintWriter pw = new PrintWriter(f)) {
+                pw.println(PORT);
+            } catch (Exception e) {}
         }
     }
 
-    // Substitua o seu método loadList por este mais robusto
     private static void loadList(String fileName, Set<String> targetSet) {
         File f = new File(fileName);
-        if (!f.exists()) {
-            try {
-                f.createNewFile(); // Garante que o arquivo existe para futuras gravações
-                System.out.println("[INFO] Arquivo criado: " + fileName);
-            } catch (IOException e) {
-                System.out.println("[!] Erro crítico: Sem permissão para criar " + fileName);
-            }
-            return;
-        }
+        if (!f.exists()) return;
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
             String line;
             while ((line = br.readLine()) != null) {
                 if (!line.trim().isEmpty()) targetSet.add(line.trim());
             }
-            System.out.println("[LOG] " + fileName + " carregado. Itens: " + targetSet.size());
-        } catch (IOException e) {
-            System.out.println("[!] Erro ao ler " + fileName);
-        }
+        } catch (IOException e) { System.out.println("[!] Erro ao carregar " + fileName); }
     }
 
     private static void saveList(String fileName, Set<String> sourceSet) {
@@ -102,49 +95,51 @@ public class ChatServer {
                 if (clients.containsKey(target)) {
                     String ip = clients.get(target).socket.getInetAddress().getHostAddress();
                     adminIPs.add(ip);
-                    saveList(ADMINS_FILE, adminIPs); // Persiste
+                    saveList(ADMINS_FILE, adminIPs);
                     clients.get(target).setAdmin(true);
                     System.out.println("[LOG] " + executor + " promoveu " + target + " (IP: " + ip + ")");
-                }
+                } else System.out.println("[!] Alvo não encontrado.");
                 break;
             case "deadmin":
                 if (clients.containsKey(target)) {
                     String ip = clients.get(target).socket.getInetAddress().getHostAddress();
                     adminIPs.remove(ip);
-                    saveList(ADMINS_FILE, adminIPs); // Persiste
+                    saveList(ADMINS_FILE, adminIPs);
                     clients.get(target).setAdmin(false);
-                    System.out.println("[LOG] Privilégios removidos de " + target);
+                    System.out.println("[LOG] " + executor + " removeu privilégios de " + target);
                 }
                 break;
             case "kick":
                 if (clients.containsKey(target)) {
                     clients.get(target).disconnect("TERMINADO PELO SISTEMA.");
+                    System.out.println("[LOG] " + executor + " kickou " + target + ".");
                 }
                 break;
             case "mute":
                 if (clients.containsKey(target)) {
                     boolean m = clients.get(target).toggleMute();
-                    clients.get(target).send(m ? "SYS|SILENCIADO." : "SYS|VOZ RESTAURADA.");
+                    System.out.println("[LOG] " + executor + (m ? " silenciou " : " desmutou ") + target + ".");
+                    clients.get(target).send(m ? "SYS|VOCÊ FOI SILENCIADO PELO ARQUITETO." : "SYS|SUA VOZ FOI RESTAURADA.");
                 }
                 break;
             case "ban":
                 if (clients.containsKey(target)) {
                     String ip = clients.get(target).socket.getInetAddress().getHostAddress();
                     banList.add(ip);
-                    saveList(BANS_FILE, banList); // Persiste
+                    saveList(BANS_FILE, banList);
                     clients.get(target).disconnect("CONEXÃO BANIDA.");
-                    System.out.println("[ALERTA] Banido: " + ip + " (" + target + ")");
+                    System.out.println("[ALERTA] " + executor + " BANIU o IP: " + ip + " (" + target + ")");
                 }
                 break;
             case "unban":
                 if (!target.isEmpty()) {
                     banList.remove(target);
-                    saveList(BANS_FILE, banList); // Persiste
-                    System.out.println("[LOG] Unban IP: " + target);
+                    saveList(BANS_FILE, banList);
+                    System.out.println("[LOG] " + executor + " removeu o ban do IP: " + target);
                 }
                 break;
             default:
-                if (isServerConsole) System.out.println("[?] list, admin, deadmin, kick, mute, ban, unban, /say");
+                if (isServerConsole) System.out.println("[?] list, admin, deadmin, kick, mute, ban [nome], unban [ip], /say");
         }
     }
 
@@ -184,7 +179,6 @@ public class ChatServer {
 
                 if (banList.contains(ip)) { disconnect("IP BANIDO."); return; }
 
-                // Bloqueio IP Duplo
                 if (clients.values().stream().anyMatch(c -> c.socket.getInetAddress().getHostAddress().equals(ip))) {
                     disconnect("DUPLICIDADE DE IP."); return;
                 }
@@ -192,16 +186,19 @@ public class ChatServer {
                 String line;
                 while ((line = in.readLine()) != null) {
                     String dec = MatrixCrypt.decrypt(line).trim();
-                    if (dec.length() > 1000) continue;
+
+                    // SEGURANÇA: Limite de tamanho
+                    if (dec.length() > 1000) {
+                        send("SYS|Mensagem rejeitada: Tamanho excede o limite.");
+                        continue;
+                    }
 
                     if (dec.startsWith("JOIN|")) {
                         this.name = dec.substring(5).trim();
                         if (clients.containsKey(name)) { send("SYS|ERROR_NAME_TAKEN"); continue; }
-
                         clients.put(name, this);
                         send("SYS|JOIN_SUCCESS");
 
-                        // Auto-Admin se o IP estiver na lista ou for Localhost
                         if (ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1") || adminIPs.contains(ip)) {
                             setAdmin(true);
                         }
@@ -211,25 +208,53 @@ public class ChatServer {
                         System.out.println("[CONN] " + name + " via " + ip);
                     }
                     else if (dec.startsWith("/")) {
+                        // COMANDO /FAH
                         if (dec.toLowerCase().startsWith("/fah")) {
                             long now = System.currentTimeMillis();
-                            if (now - lastFahTime.getOrDefault(name, 0L) < 5000) continue;
+                            if (now - lastFahTime.getOrDefault(name, 0L) < 5000) {
+                                send("SYS|Aguarde 5s para usar o /fah novamente.");
+                                continue;
+                            }
                             lastFahTime.put(name, now);
                             String[] parts = dec.split(" ", 2);
                             String target = parts.length > 1 ? parts[1].trim() : "";
                             if (target.isEmpty()) broadcast("SYS|FAH");
-                            else if (clients.containsKey(target)) clients.get(target).send("SYS|FAH");
+                            else if (clients.containsKey(target)) {
+                                clients.get(target).send("SYS|FAH");
+                                send("SYS|Atenção chamada em " + target);
+                            } else send("SYS|Usuário não encontrado.");
                             continue;
                         }
 
-                        if (isAdmin) processCommand(name, dec, false);
-                        else send("SYS|SEM PERMISSÃO.");
+                        // MENSAGEM PRIVADA: /usuario mensagem
+                        String[] parts = dec.split(" ", 2);
+                        String alvoPrivado = parts[0].substring(1);
+                        if (clients.containsKey(alvoPrivado) && parts.length > 1) {
+                            clients.get(alvoPrivado).send("PV|" + name + "|" + parts[1]);
+                            send("PV|Para " + alvoPrivado + "|" + parts[1]);
+                            continue;
+                        }
+
+                        // COMANDO /HELP
+                        if (dec.equalsIgnoreCase("/help") || dec.equalsIgnoreCase("/ajuda")) {
+                            send("SYS|COMANDOS AGENTE: /kick, /mute, /ban, /list, /unban [ip]");
+                            send("SYS|COMANDOS GERAIS: /fah [nome], /nomeDaPessoa [mensagem]");
+                        } else if (isAdmin) {
+                            processCommand(name, dec, false);
+                        } else {
+                            send("SYS|ERRO: Comando não reconhecido ou sem permissão.");
+                        }
                     }
                     else if (dec.startsWith("MSG|")) {
+                        // SEGURANÇA: Anti-Spam
                         long now = System.currentTimeMillis();
-                        if (now - lastMsgTime < 500) continue;
+                        if (now - lastMsgTime < 500) {
+                            send("SYS|Anti-Spam: Você está indo rápido demais.");
+                            continue;
+                        }
                         lastMsgTime = now;
                         if (!isMuted) broadcast("MSG|" + name + "|" + dec.substring(4));
+                        else send("SYS|Você está em silêncio.");
                     }
                 }
             } catch (Exception e) {
