@@ -18,6 +18,7 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -26,6 +27,8 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.LinkedList;
+import java.util.Queue;
 
 public class Main extends Application {
     private String host = "10.110.71.48";
@@ -47,13 +50,23 @@ public class Main extends Application {
     private int[] drops;
     private final String matrixChars = "0123456789ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ";
 
+    // Banco de dados dinâmico de sons
+    private final Map<String, String> soundMap = new HashMap<>();
+    private final Queue<String> soundQueue = new LinkedList<>();
+    private boolean isPlayingSound = false;
+
+    // Player ÚNICO e global para evitar estouro de instâncias de áudio nativas
+    private MediaPlayer mediaPlayer;
+
     @Override
     public void start(Stage stage) {
-        loadConfig(); // Carrega IP/Porta do txt
+        loadConfig();
+        loadSoundConfig();
         setupMainUI(stage);
 
         stage.setOnCloseRequest(e -> {
             try { if (socket != null) socket.close(); } catch (IOException ex) {}
+            if (mediaPlayer != null) mediaPlayer.dispose(); // Libera o hardware de áudio ao sair
             Platform.exit();
             System.exit(0);
         });
@@ -67,7 +80,6 @@ public class Main extends Application {
         }).start();
     }
 
-    // Carrega IP e Porta de um arquivo txt
     private void loadConfig() {
         try {
             File f = new File("config.txt");
@@ -83,7 +95,37 @@ public class Main extends Application {
         }
     }
 
-    // Salva/Carrega o último usuário
+    private void loadSoundConfig() {
+        File f = new File("sounds.txt");
+        if (!f.exists()) {
+            try (PrintWriter writer = new PrintWriter(new FileWriter(f))) {
+                writer.println("JOIN=sounds/join.mp3");
+                writer.println("LEAVE=sounds/leave.mp3");
+                writer.println("MAINFRAME=sounds/mainframe.mp3");
+                writer.println("MSG=sounds/msg.mp3");
+                writer.println("FAH=sounds/fah.mp3");
+            } catch (IOException e) {
+                System.err.println("Erro ao criar mapa padrão de sons.");
+            }
+        }
+
+        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+            String line;
+            soundMap.clear();
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] parts = line.split("=", 2);
+                if (parts.length == 2) {
+                    soundMap.put(parts[0].trim().toUpperCase(), parts[1].trim());
+                }
+            }
+            System.out.println("[SISTEMA] Banco de dados de áudio carregado. Total: " + soundMap.size() + " sons.");
+        } catch (Exception e) {
+            System.err.println("Erro ao carregar mapa dinâmico de sons.");
+        }
+    }
+
     private String getLastUser() {
         try {
             File f = new File("lastuser.txt");
@@ -124,12 +166,14 @@ public class Main extends Application {
         input.setOnAction(e -> {
             String t = input.getText().trim();
             if (t.isEmpty()) return;
-            if (t.equalsIgnoreCase("/notif")) {
+
+            if (t.equalsIgnoreCase("/notif") || t.equalsIgnoreCase("/som")) {
                 notificationsEnabled = !notificationsEnabled;
-                chat.appendText("[SISTEMA] Notificações: " + (notificationsEnabled ? "ON" : "OFF") + "\n");
+                chat.appendText("[SISTEMA] Efeitos Sonoros: " + (notificationsEnabled ? "ON" : "OFF") + "\n");
                 input.clear();
                 return;
             }
+
             history.add(t);
             historyIndex = -1;
             input.clear();
@@ -183,14 +227,80 @@ public class Main extends Application {
         }
     }
 
-    private void playAlertSound() {
+    private void playAlertSound(String soundKey) {
         if (!notificationsEnabled) return;
+
+        String fileName = soundMap.get(soundKey.toUpperCase());
+        if (fileName == null) return;
+
+        Platform.runLater(() -> {
+            soundQueue.add(fileName);
+            processSoundQueue();
+        });
+    }
+
+    // Gerenciador corrigido: reaproveita recursos de hardware e limpa buffers nativos
+    private void processSoundQueue() {
+        if (isPlayingSound || soundQueue.isEmpty()) return;
+
+        String nextSound = soundQueue.poll();
         try {
-            File file = new File("alert.mp3");
-            if (file.exists()) {
-                new MediaPlayer(new Media(file.toURI().toString())).play();
+            String mediaUri = null;
+
+            // Verifica se a linha do txt é um link da internet
+            if (nextSound.toLowerCase().startsWith("http://") || nextSound.toLowerCase().startsWith("https://")) {
+                mediaUri = nextSound; // É um link direto da web!
+            } else {
+                // É um arquivo local na máquina
+                File file = new File(nextSound);
+                if (file.exists()) {
+                    mediaUri = file.toURI().toString();
+                }
             }
-        } catch (Exception e) {}
+
+            // Se encontrou uma origem válida (seja local ou web), executa:
+            if (mediaUri != null) {
+                isPlayingSound = true;
+
+                if (mediaPlayer != null) {
+                    mediaPlayer.stop();
+                    mediaPlayer.dispose();
+                    mediaPlayer = null;
+                }
+
+                Media media = new Media(mediaUri);
+                mediaPlayer = new MediaPlayer(media);
+
+                mediaPlayer.setOnEndOfMedia(() -> {
+                    Platform.runLater(() -> {
+                        isPlayingSound = false;
+                        if (mediaPlayer != null) {
+                            mediaPlayer.stop();
+                            mediaPlayer.dispose();
+                            mediaPlayer = null;
+                        }
+                        System.gc();
+                        processSoundQueue();
+                    });
+                });
+
+                mediaPlayer.setOnError(() -> {
+                    Platform.runLater(() -> {
+                        System.err.println("[ERRO ÁUDIO] Falha ao carregar mídia (Link quebrado ou sem internet): " + nextSound);
+                        isPlayingSound = false;
+                        processSoundQueue();
+                    });
+                });
+
+                mediaPlayer.play();
+            } else {
+                // Se o arquivo local não existir ou o link estiver mal estruturado, pula pro próximo
+                processSoundQueue();
+            }
+        } catch (Exception e) {
+            isPlayingSound = false;
+            processSoundQueue();
+        }
     }
 
     private void handle(String m) {
@@ -198,23 +308,31 @@ public class Main extends Application {
             if (loginStage != null) loginStage.close();
             input.requestFocus();
             chat.appendText(">>> BEM-VINDO À REDE ZION.\n");
-        } else if (m.equals("SYS|FAH")) {
-            playAlertSound();
-            chat.appendText("[ALERTA] ATENÇÃO SOLICITADA PELO AGENTE!\n");
         } else if (m.equals("SYS|ARCHITECT_MODE_ON")) {
-            applyMatrixStyle("#FF0000");
             chat.appendText(">>> ACESSO DE AGENTE CONFIRMADO.\n");
         } else if (m.equals("SYS|ARCHITECT_MODE_OFF")) {
             applyMatrixStyle("#003300");
             chat.appendText(">>> STATUS: PRIVILÉGIOS REVOGADOS.\n");
+        } else if (m.startsWith("AUDIO|")) {
+            String soundKey = m.substring(6).trim();
+            playAlertSound(soundKey);
         } else if (m.startsWith("USERS|")) {
             usersList.getItems().clear();
             for (String u : m.substring(6).split(",")) if(!u.isEmpty()) usersList.getItems().add(u);
+        } else if (m.startsWith("PV|")) {
+            String[] p = m.split("\\|", 3);
+            chat.appendText("[PRIVADO] <" + p[1] + "> " + p[2] + "\n");
+            playAlertSound("FAH");
         } else if (m.startsWith("MSG|")) {
             String[] p = m.split("\\|", 3);
             chat.appendText("<" + p[1] + "> " + p[2] + "\n");
+            playAlertSound("MSG");
         } else if (m.startsWith("SYS|")) {
             chat.appendText("[SYS] " + m.substring(4) + "\n");
+
+            if (m.contains("[+]")) playAlertSound("JOIN");
+            else if (m.contains("[-]")) playAlertSound("LEAVE");
+            else if (m.contains("[MAINFRAME]")) playAlertSound("MAINFRAME");
         }
     }
 
@@ -268,14 +386,14 @@ public class Main extends Application {
         VBox layout = new VBox(10); layout.setAlignment(Pos.CENTER); layout.setPadding(new Insets(20));
         layout.setStyle("-fx-background-color: black; -fx-border-color: #00ff00;");
 
-        TextField nf = new TextField(getLastUser()); // Carrega último usuário
+        TextField nf = new TextField(getLastUser());
         nf.setStyle("-fx-background-color: #001100; -fx-text-fill: #00ff00; -fx-font-family: 'Consolas';");
 
         Button b = new Button("CONECTAR");
         Runnable loginAction = () -> {
             String name = nf.getText().trim();
             if(!name.isEmpty()){
-                saveLastUser(name); // Salva para a próxima vez
+                saveLastUser(name);
                 send("JOIN|"+name);
                 b.setDisable(true);
                 nf.setDisable(true);

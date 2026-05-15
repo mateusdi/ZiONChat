@@ -187,7 +187,6 @@ public class ChatServer {
                 while ((line = in.readLine()) != null) {
                     String dec = MatrixCrypt.decrypt(line).trim();
 
-                    // SEGURANÇA: Limite de tamanho
                     if (dec.length() > 1000) {
                         send("SYS|Mensagem rejeitada: Tamanho excede o limite.");
                         continue;
@@ -205,61 +204,86 @@ public class ChatServer {
 
                         updateUsers();
                         broadcast("SYS|[+] " + name + (isAdmin ? " (AGENTE)" : ""));
+                        //broadcast("AUDIO|JOIN");
                         System.out.println("[CONN] " + name + " via " + ip);
                     }
                     else if (dec.startsWith("/")) {
-                        // COMANDO /FAH
-                        if (dec.toLowerCase().startsWith("/fah")) {
+                        String[] parts = dec.split(" ", 2);
+                        String cmdOriginal = parts[0].substring(1);
+                        String cmdLower = cmdOriginal.toLowerCase();
+
+                        if (cmdLower.startsWith("fah")) {
                             long now = System.currentTimeMillis();
                             if (now - lastFahTime.getOrDefault(name, 0L) < 5000) {
                                 send("SYS|Aguarde 5s para usar o /fah novamente.");
                                 continue;
                             }
                             lastFahTime.put(name, now);
-                            String[] parts = dec.split(" ", 2);
                             String target = parts.length > 1 ? parts[1].trim() : "";
-                            if (target.isEmpty()) broadcast("SYS|FAH");
-                            else if (clients.containsKey(target)) {
+                            if (target.isEmpty()) {
+                                broadcast("SYS|FAH");
+                                broadcast("AUDIO|FAH");
+                            } else if (clients.containsKey(target)) {
                                 clients.get(target).send("SYS|FAH");
+                                clients.get(target).send("AUDIO|FAH");
                                 send("SYS|Atenção chamada em " + target);
                             } else send("SYS|Usuário não encontrado.");
                             continue;
                         }
 
-                        // MENSAGEM PRIVADA: /usuario mensagem
-                        String[] parts = dec.split(" ", 2);
-                        String alvoPrivado = parts[0].substring(1);
-                        if (clients.containsKey(alvoPrivado) && parts.length > 1) {
-                            clients.get(alvoPrivado).send("PV|" + name + "|" + parts[1]);
-                            send("PV|Para " + alvoPrivado + "|" + parts[1]);
+                        if (cmdLower.equals("help") || cmdLower.equals("ajuda")) {
+                            send("SYS|COMANDOS AGENTE: /kick, /mute, /ban, /list, /unban [ip]");
+                            send("SYS|COMANDOS GERAIS: /fah [nome], /som (liga/desliga efeitos sonoros), /[qualquer_som_do_txt]");
                             continue;
                         }
 
-                        // COMANDO /HELP
-                        if (dec.equalsIgnoreCase("/help") || dec.equalsIgnoreCase("/ajuda")) {
-                            send("SYS|COMANDOS AGENTE: /kick, /mute, /ban, /list, /unban [ip]");
-                            send("SYS|COMANDOS GERAIS: /fah [nome], /nomeDaPessoa [mensagem]");
-                        } else if (isAdmin) {
-                            processCommand(name, dec, false);
-                        } else {
-                            send("SYS|ERRO: Comando não reconhecido ou sem permissão.");
+                        // Se o comando for o nome de um usuário online (mensagem privada)
+                        if (clients.containsKey(cmdOriginal)) {
+                            if (parts.length > 1) {
+                                clients.get(cmdOriginal).send("PV|" + name + "|" + parts[1]);
+                                send("PV|Para " + cmdOriginal + "|" + parts[1]);
+                            } else {
+                                send("SYS|ERRO: Mensagem privada vazia. Uso correto: /usuario texto_da_mensagem");
+                            }
+                            continue;
                         }
+
+                        // Se for um comando de administração rodado por um Agente
+                        if (isAdmin && (cmdLower.equals("kick") || cmdLower.equals("mute") || cmdLower.equals("ban") || cmdLower.equals("unban") || cmdLower.equals("admin") || cmdLower.equals("deadmin") || cmdLower.equals("list"))) {
+                            processCommand(name, dec, false);
+                            continue;
+                        }
+
+                        // ============================================================
+                        // GATILHO 100% DINÂMICO PARA OS SONS DO SEU ARQUIVO TXT
+                        // ============================================================
+                        // Qualquer coisa que não caiu nas regras acima vira um comando de som!
+                        // O servidor avisa o chat e dispara a reprodução da chave em CAIXA ALTA.
+                        broadcast("SYS| * " + name + " usou o efeito: /" + cmdLower);
+                        broadcast("AUDIO|" + cmdOriginal.toUpperCase());
                     }
                     else if (dec.startsWith("MSG|")) {
-                        // SEGURANÇA: Anti-Spam
                         long now = System.currentTimeMillis();
                         if (now - lastMsgTime < 500) {
                             send("SYS|Anti-Spam: Você está indo rápido demais.");
                             continue;
                         }
                         lastMsgTime = now;
-                        if (!isMuted) broadcast("MSG|" + name + "|" + dec.substring(4));
-                        else send("SYS|Você está em silêncio.");
+                        if (!isMuted) {
+                            broadcast("MSG|" + name + "|" + dec.substring(4));
+                        } else {
+                            send("SYS|Você está em silêncio.");
+                        }
                     }
                 }
             } catch (Exception e) {
             } finally {
-                if (name != null) { clients.remove(name); updateUsers(); broadcast("SYS|[-] " + name); }
+                if (name != null) {
+                    clients.remove(name);
+                    updateUsers();
+                    broadcast("SYS|[-] " + name);
+                    //broadcast("AUDIO|LEAVE");
+                }
             }
         }
     }

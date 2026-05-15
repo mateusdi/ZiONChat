@@ -1,40 +1,42 @@
 
-V	java:S106Ó"9Replace this use of System.out or System.err by a logger.(Ê²§â8ì¶ô”â3
-o
-java:S1450 "QRemove the "in" field and declare it as a local variable in the relevant methods.(»ğ¶ü8ì¶ô”â3
-U	java:S106-"9Replace this use of System.out or System.err by a logger.(ºÊîÏ8ì¶ô”â3
-V	java:S106ˆ"9Replace this use of System.out or System.err by a logger.(÷ò™ß8ì¶ô”â3
-v	java:S135Á"YReduce the total number of break and continue statements in this loop to use at most one.(‘Æìó8ì¶ô”â3
-t
-java:S3776["RRefactor this method to reduce its Cognitive Complexity from 20 to the 15 allowed.(âåÜ¬úÿÿÿÿ8ì¶ô”â3
-Z	java:S106"9Replace this use of System.out or System.err by a logger.(ÁË„ºşÿÿÿÿ8ì¶ô”â3
-l
-java:S3008"ORename this field "PORT" to match the regular expression '^[a-z][a-zA-Z0-9]*$'.(¯õ¨8ì¶ô”â3
-\
-java:S4719µ"9Replace charset name argument with StandardCharsets.UTF_8(ç­¤¸ûÿÿÿÿ8ì¶ô”â3
-U	java:S106"9Replace this use of System.out or System.err by a logger.(Ç€†8ì¶ô”â3
-\
-java:S4719¶"9Replace charset name argument with StandardCharsets.UTF_8(òş÷Áûÿÿÿÿ8ì¶ô”â3
-D
-java:S2189 ""Add an end condition to this loop.(˜ïˆÿÿÿÿÿ8ì¶ô”â3
+Z	java:S106"9Replace this use of System.out or System.err by a logger.(ÁË„ºşÿÿÿÿ8”êÒäâ3
 E
-java:S1148$"#Use a logger to log this exception.(àºçÍşÿÿÿÿ8ì¶ô”â3
-[	java:S106"9Replace this use of System.out or System.err by a logger.(Ç½Õíıÿÿÿÿ8ì¶ô”â3
-Z	java:S106K"9Replace this use of System.out or System.err by a logger.(ñÂÑœùÿÿÿÿ8ì¶ô”â3
-Z	java:S106t"9Replace this use of System.out or System.err by a logger.(Ñæóïıÿÿÿÿ8ì¶ô”â3
-U	java:S106“"9Replace this use of System.out or System.err by a logger.(±Š×08ì¶ô”â3
-K	java:S108¯")Either remove or fill this block of code.(ãŸ¨£üÿÿÿÿ8ì¶ô”â3
-p
-java:S3776³"RRefactor this method to reduce its Cognitive Complexity from 47 to the 15 allowed.(“–ış8ì¶ô”â3
-F	java:S108ë")Either remove or fill this block of code.(”ı¾8ì¶ô”â3
+java:S1148#"#Use a logger to log this exception.(àºçÍşÿÿÿÿ8”êÒäâ3
+Z	java:S106x"9Replace this use of System.out or System.err by a logger.(äú”ıûÿÿÿÿ8”êÒäâ3
+i
+java:S1192c"GDefine a constant instead of duplicating this literal "[LOG] " 5 times.(öœËışÿÿÿÿ8”êÒäâ3
+\
+java:S4719¯"9Replace charset name argument with StandardCharsets.UTF_8(ç­¤¸ûÿÿÿÿ8”êÒäâ3
+Z	java:S106C"9Replace this use of System.out or System.err by a logger.(ñÂÑœùÿÿÿÿ8”êÒäâ3
+v	java:S135º"YReduce the total number of break and continue statements in this loop to use at most one.(‘Æìó8”êÒäâ3
+V	java:S106‰"9Replace this use of System.out or System.err by a logger.(êòõ8”êÒäâ3
+V	java:S106Ğ"9Replace this use of System.out or System.err by a logger.(Ê²§â8”êÒäâ3
+l
+java:S3008"ORename this field "PORT" to match the regular expression '^[a-z][a-zA-Z0-9]*$'.(¡º…ñ8”êÒäâ3
 M
-java:S2093´"*Change this "try" to a try-with-resources.(¡»¢üùÿÿÿÿ8ì¶ô”â3
-U	java:S106c"9Replace this use of System.out or System.err by a logger.(Óà™Å8ì¶ô”â3
-P
-java:S1118ò":Add a private constructor to hide the implicit public one.(¹îş
-Z	java:S106k"9Replace this use of System.out or System.err by a logger.(öœËışÿÿÿÿ8ì¶ô”â3
-c	java:S8996"BDo something with the "boolean" value returned by "createNewFile".(ÂÁò±şÿÿÿÿ8™¬¬•â3
-U	java:S1067"9Replace this use of System.out or System.err by a logger.(üßÔ›8™¬¬•â3
-Z	java:S1069"9Replace this use of System.out or System.err by a logger.(È²¥İøÿÿÿÿ8™¬¬•â3
-U	java:S106B"9Replace this use of System.out or System.err by a logger.(Š®Ô8™¬¬•â3
-Z	java:S106D"9Replace this use of System.out or System.err by a logger.(ùïÎÂûÿÿÿÿ8™¬¬•â3
+java:S2093®"*Change this "try" to a try-with-resources.(¡»¢üùÿÿÿÿ8”êÒäâ3
+K	java:S108©")Either remove or fill this block of code.(ãŸ¨£üÿÿÿÿ8”êÒäâ3
+F	java:S108–")Either remove or fill this block of code.(”ı¾8”êÒäâ3
+\
+java:S4719°"9Replace charset name argument with StandardCharsets.UTF_8(òş÷Áûÿÿÿÿ8”êÒäâ3
+Z	java:S106r"9Replace this use of System.out or System.err by a logger.(Õ˜´‚úÿÿÿÿ8”êÒäâ3
+U	java:S106,"9Replace this use of System.out or System.err by a logger.(Ü…¸8”êÒäâ3
+V	java:S106‚"9Replace this use of System.out or System.err by a logger.(ªÉñ‘8”êÒäâ3
+U	java:S106"9Replace this use of System.out or System.err by a logger.(Ç€†8”êÒäâ3
+D
+java:S2189""Add an end condition to this loop.(˜ïˆÿÿÿÿÿ8”êÒäâ3
+J	java:S1081")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8”êÒäâ3
+[	java:S106"9Replace this use of System.out or System.err by a logger.(…’Ÿ‰ıÿÿÿÿ8”êÒäâ3
+U	java:S106="9Replace this use of System.out or System.err by a logger.(¼ÈËÙ8”êÒäâ3
+Z	java:S106d"9Replace this use of System.out or System.err by a logger.(…íÇâÿÿÿÿÿ8”êÒäâ3
+Z	java:S106c"9Replace this use of System.out or System.err by a logger.(öœËışÿÿÿÿ8”êÒäâ3
+t
+java:S3776S"RRefactor this method to reduce its Cognitive Complexity from 24 to the 15 allowed.(âåÜ¬úÿÿÿÿ8”êÒäâ3
+Z	java:S106l"9Replace this use of System.out or System.err by a logger.(¿›¡™ıÿÿÿÿ8”êÒäâ3
+W
+java:S1118¢":Add a private constructor to hide the implicit public one.(¹îş8”êÒäâ3
+p
+java:S3776­"RRefactor this method to reduce its Cognitive Complexity from 64 to the 15 allowed.(“–ış8”êÒäâ3
+U	java:S106["9Replace this use of System.out or System.err by a logger.(Óà™Å8”êÒäâ3
+o
+java:S1450š"QRemove the "in" field and declare it as a local variable in the relevant methods.(»ğ¶ü8”êÒäâ3

@@ -1,33 +1,46 @@
 
-h
-java:S1192I"KDefine a constant instead of duplicating this literal "config.txt" 3 times.(ğÊ®±8Ö§ï“â3
-o
-java:S1192Y"MDefine a constant instead of duplicating this literal "lastuser.txt" 3 times.(ø©§¿ùÿÿÿÿ8Ö§ï“â3
 k
-java:S2184å"HCast one of the operands of this multiplication operation to a "double".(ìöüÜùÿÿÿÿ8Ö§ï“â3
+java:S2184Ñ"HCast one of the operands of this multiplication operation to a "double".(üÙˆ¿úÿÿÿÿ8€ÜÑäâ3
+K	java:S108ì")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8€ÜÑäâ3
 k
-java:S2184å"HCast one of the operands of this multiplication operation to a "double".(ìöüÜùÿÿÿÿ8Ö§ï“â3
+java:S2184Ï"HCast one of the operands of this multiplication operation to a "double".(ìöüÜùÿÿÿÿ8€ÜÑäâ3
 k
-java:S2184ç"HCast one of the operands of this multiplication operation to a "double".(üÙˆ¿úÿÿÿÿ8Ö§ï“â3
-k
-java:S2184ç"HCast one of the operands of this multiplication operation to a "double".(üÙˆ¿úÿÿÿÿ8Ö§ï“â3
-n
-java:S1450*"QRemove the "in" field and declare it as a local variable in the relevant methods.(»ğ¶ü8Ö§ï“â3
-C
-java:S1170."!Make this final field static too.(ï÷ûÿÿÿÿ8Ö§ï“â3
->
-java:S11700"!Make this final field static too.(Ö°ğ8Ö§ï“â3
-E	java:S1088")Either remove or fill this block of code.(§îˆ8Ö§ï“â3
-U	java:S106R"9Replace this use of System.out or System.err by a logger.(îö Œ8Ö§ï“â3
-J	java:S108[")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8Ö§ï“â3
-J	java:S108`")Either remove or fill this block of code.(ûƒÏ©øÿÿÿÿ8Ö§ï“â3
-H
-java:S1905h"&Remove this unnecessary cast to "int".(Ö¡à…ùÿÿÿÿ8Ö§ï“â3
-K	java:S108Á")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8Ö§ï“â3
+java:S2184Ñ"HCast one of the operands of this multiplication operation to a "double".(üÙˆ¿úÿÿÿÿ8€ÜÑäâ3
 A
-java:S2119á"Save and re-use this "Random".(šŸ«íøÿÿÿÿ8Ö§ï“â3
+java:S2119Ë"Save and re-use this "Random".(šŸ«íøÿÿÿÿ8€ÜÑäâ3
+n
+java:S1450-"QRemove the "in" field and declare it as a local variable in the relevant methods.(»ğ¶ü8 Øûäâ3
 \
-java:S4719ù"9Replace charset name argument with StandardCharsets.UTF_8(ç­¤¸ûÿÿÿÿ8Ö§ï“â3
+java:S4719ä"9Replace charset name argument with StandardCharsets.UTF_8(òş÷Áûÿÿÿÿ8€ÜÑäâ3
+C
+java:S11701"!Make this final field static too.(ï÷ûÿÿÿÿ8 Øûäâ3
 \
-java:S4719ú"9Replace charset name argument with StandardCharsets.UTF_8(òş÷Áûÿÿÿÿ8Ö§ï“â3
-K	java:S108‚")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8Ö§ï“â3
+java:S4719ã"9Replace charset name argument with StandardCharsets.UTF_8(ç­¤¸ûÿÿÿÿ8€ÜÑäâ3
+>
+java:S11703"!Make this final field static too.(Ö°ğ8 Øûäâ3
+k
+java:S2184Ï"HCast one of the operands of this multiplication operation to a "double".(ìöüÜùÿÿÿÿ8€ÜÑäâ3
+h
+java:S1192U"KDefine a constant instead of duplicating this literal "config.txt" 3 times.(ğÊ®±8ãñ‡åâ3
+p
+java:S1192ƒ"MDefine a constant instead of duplicating this literal "lastuser.txt" 3 times.(ø©§¿ùÿÿÿÿ8ãñ‡åâ3
+E	java:S108D")Either remove or fill this block of code.(§îˆ8ãñ‡åâ3
+U	java:S106^"9Replace this use of System.out or System.err by a logger.(îö Œ8ãñ‡åâ3
+Z	java:S106l"9Replace this use of System.out or System.err by a logger.(Øš€Èùÿÿÿÿ8ãñ‡åâ3
+U	java:S106{"9Replace this use of System.out or System.err by a logger.(·€Ù“8ãñ‡åâ3
+U	java:S106}"9Replace this use of System.out or System.err by a logger.(ˆªê–8ãñ‡åâ3
+K	java:S108…")Either remove or fill this block of code.(¬Àáªøÿÿÿÿ8ãñ‡åâ3
+K	java:S108Š")Either remove or fill this block of code.(ûƒÏ©øÿÿÿÿ8ãñ‡åâ3
+u
+java:S3776"RRefactor this method to reduce its Cognitive Complexity from 16 to the 15 allowed.(íÒ±¸úÿÿÿÿ8ãñ‡åâ3
+I
+java:S1905’"&Remove this unnecessary cast to "int".(Ö¡à…ùÿÿÿÿ8ãñ‡åâ3
+J
+java:S1602‡",Remove useless curly braces around statement(çìû8ãñ‡åâ3
+r
+java:S1215"TDon't try to be smarter than the JVM, remove this call to run the garbage collector.(æ³Œâ8ãñ‡åâ3
+O
+java:S1602”",Remove useless curly braces around statement(ïûª¬ıÿÿÿÿ8ãñ‡åâ3
+U	java:S106–"9Replace this use of System.out or System.err by a logger.(à¨¨)8ãñ‡åâ3
+u
+java:S3776¦"RRefactor this method to reduce its Cognitive Complexity from 19 to the 15 allowed.(ò¤®Áúÿÿÿÿ8ãñ‡åâ3
