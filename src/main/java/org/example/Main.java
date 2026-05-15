@@ -44,38 +44,55 @@ public class Main extends Application {
     private PrintWriter out;
     private BufferedReader in;
     private Stage loginStage;
+    private Stage mainStage;
 
     private boolean notificationsEnabled = true;
     private final int fontSize = 16;
     private int[] drops;
     private final String matrixChars = "0123456789ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ";
 
-    // Banco de dados dinâmico de sons
     private final Map<String, String> soundMap = new HashMap<>();
     private final Queue<String> soundQueue = new LinkedList<>();
     private boolean isPlayingSound = false;
+    private boolean isReconnecting = false;
 
-    // Player ÚNICO e global para evitar estouro de instâncias de áudio nativas
     private MediaPlayer mediaPlayer;
 
     @Override
     public void start(Stage stage) {
+        this.mainStage = stage;
         loadConfig();
         loadSoundConfig();
         setupMainUI(stage);
 
         stage.setOnCloseRequest(e -> {
-            try { if (socket != null) socket.close(); } catch (IOException ex) {}
-            if (mediaPlayer != null) mediaPlayer.dispose(); // Libera o hardware de áudio ao sair
-            Platform.exit();
-            System.exit(0);
+            cleanUpAndExit();
         });
 
+        startConnectionThread();
+    }
+
+    private void cleanUpAndExit() {
+        try { if (socket != null) socket.close(); } catch (IOException ex) {}
+        if (mediaPlayer != null) mediaPlayer.dispose();
+        Platform.exit();
+        System.exit(0);
+    }
+
+    private void startConnectionThread() {
         new Thread(() -> {
-            if (connectToServer()) {
-                Platform.runLater(() -> showLoginWindow(stage));
-            } else {
-                Platform.runLater(() -> chat.appendText("[!] Zion Offline em " + host + ":" + port + ". Verifique o config.txt.\n"));
+            while (true) {
+                if (connectToServer()) {
+                    isReconnecting = false;
+                    Platform.runLater(() -> showLoginWindow(mainStage));
+                    break;
+                } else {
+                    if (!isReconnecting) {
+                        isReconnecting = true;
+                        Platform.runLater(() -> chat.appendText("[!] Link com a Zion rompido. Tentando reconexão em segundo plano...\n"));
+                    }
+                    try { Thread.sleep(5000); } catch (InterruptedException e) {}
+                }
             }
         }).start();
     }
@@ -120,7 +137,6 @@ public class Main extends Application {
                     soundMap.put(parts[0].trim().toUpperCase(), parts[1].trim());
                 }
             }
-            System.out.println("[SISTEMA] Banco de dados de áudio carregado. Total: " + soundMap.size() + " sons.");
         } catch (Exception e) {
             System.err.println("Erro ao carregar mapa dinâmico de sons.");
         }
@@ -174,6 +190,12 @@ public class Main extends Application {
                 return;
             }
 
+            if (t.equalsIgnoreCase("/clean")) {
+                chat.clear();
+                input.clear();
+                return;
+            }
+
             history.add(t);
             historyIndex = -1;
             input.clear();
@@ -203,6 +225,21 @@ public class Main extends Application {
     private void handleTabComplete() {
         String text = input.getText();
         if (text.isEmpty()) return;
+
+        if (text.toLowerCase().startsWith("/fx ")) {
+            String[] parts = text.split(" ", 2);
+            String currentFxQuery = parts.length > 1 ? parts[1].trim() : "";
+
+            soundMap.keySet().stream()
+                    .filter(soundKey -> soundKey.toLowerCase().startsWith(currentFxQuery.toLowerCase()))
+                    .findFirst()
+                    .ifPresent(match -> {
+                        input.setText("/fx " + match.toLowerCase());
+                        input.positionCaret(input.getText().length());
+                    });
+            return;
+        }
+
         String[] words = text.split(" ");
         String lastWord = words[words.length - 1];
         String searchPrefix = lastWord.startsWith("/") ? lastWord.substring(1) : lastWord;
@@ -239,7 +276,6 @@ public class Main extends Application {
         });
     }
 
-    // Gerenciador corrigido: reaproveita recursos de hardware e limpa buffers nativos
     private void processSoundQueue() {
         if (isPlayingSound || soundQueue.isEmpty()) return;
 
@@ -247,18 +283,15 @@ public class Main extends Application {
         try {
             String mediaUri = null;
 
-            // Verifica se a linha do txt é um link da internet
             if (nextSound.toLowerCase().startsWith("http://") || nextSound.toLowerCase().startsWith("https://")) {
-                mediaUri = nextSound; // É um link direto da web!
+                mediaUri = nextSound;
             } else {
-                // É um arquivo local na máquina
                 File file = new File(nextSound);
                 if (file.exists()) {
                     mediaUri = file.toURI().toString();
                 }
             }
 
-            // Se encontrou uma origem válida (seja local ou web), executa:
             if (mediaUri != null) {
                 isPlayingSound = true;
 
@@ -286,7 +319,6 @@ public class Main extends Application {
 
                 mediaPlayer.setOnError(() -> {
                     Platform.runLater(() -> {
-                        System.err.println("[ERRO ÁUDIO] Falha ao carregar mídia (Link quebrado ou sem internet): " + nextSound);
                         isPlayingSound = false;
                         processSoundQueue();
                     });
@@ -294,7 +326,6 @@ public class Main extends Application {
 
                 mediaPlayer.play();
             } else {
-                // Se o arquivo local não existir ou o link estiver mal estruturado, pula pro próximo
                 processSoundQueue();
             }
         } catch (Exception e) {
@@ -308,11 +339,25 @@ public class Main extends Application {
             if (loginStage != null) loginStage.close();
             input.requestFocus();
             chat.appendText(">>> BEM-VINDO À REDE ZION.\n");
+            chat.appendText("[SISTEMA] Digite /ajuda ou /help para visualizar os comandos operacionais.\n");
         } else if (m.equals("SYS|ARCHITECT_MODE_ON")) {
             chat.appendText(">>> ACESSO DE AGENTE CONFIRMADO.\n");
         } else if (m.equals("SYS|ARCHITECT_MODE_OFF")) {
             applyMatrixStyle("#003300");
             chat.appendText(">>> STATUS: PRIVILÉGIOS REVOGADOS.\n");
+        } else if (m.startsWith("SOUND_SYNC|")) {
+            String content = m.substring(11);
+            soundMap.clear();
+            loadSoundConfig();
+            if (!content.isEmpty()) {
+                String[] pairs = content.split(";");
+                for (String pair : pairs) {
+                    String[] parts = pair.split("=", 2);
+                    if (parts.length == 2) {
+                        soundMap.put(parts[0].toUpperCase(), parts[1]);
+                    }
+                }
+            }
         } else if (m.startsWith("AUDIO|")) {
             String soundKey = m.substring(6).trim();
             playAlertSound(soundKey);
@@ -322,7 +367,6 @@ public class Main extends Application {
         } else if (m.startsWith("PV|")) {
             String[] p = m.split("\\|", 3);
             chat.appendText("[PRIVADO] <" + p[1] + "> " + p[2] + "\n");
-            playAlertSound("FAH");
         } else if (m.startsWith("MSG|")) {
             String[] p = m.split("\\|", 3);
             chat.appendText("<" + p[1] + "> " + p[2] + "\n");
@@ -332,7 +376,8 @@ public class Main extends Application {
 
             if (m.contains("[+]")) playAlertSound("JOIN");
             else if (m.contains("[-]")) playAlertSound("LEAVE");
-            else if (m.contains("[MAINFRAME]")) playAlertSound("MAINFRAME");
+                // GATILHO ADICIONADO AQUI: Toca o alarme sempre que houver [MAINFRAME] ou [ALERTA] do /restart
+            else if (m.contains("[MAINFRAME]") ) playAlertSound("MAINFRAME");
         }
     }
 
@@ -357,8 +402,9 @@ public class Main extends Application {
     }
 
     private void style(Control c, String bc) {
-        c.setStyle("-fx-control-inner-background: rgba(0, 20, 0, 0.7); -fx-text-fill: #00ff00; -fx-font-family: 'Consolas'; " +
-                "-fx-background-color: transparent; -fx-border-color: " + bc + "; -fx-border-width: 2; -fx-padding: 5;");
+        // MUDANÇA AQUI: Fundo preto sólido fixo aplicado para não reagir mais ao ganho/perda de foco
+        c.setStyle("-fx-control-inner-background: #000000; -fx-background-color: #000000; -fx-text-fill: #00ff00; -fx-font-family: 'Consolas'; " +
+                "-fx-border-color: " + bc + "; -fx-border-width: 2; -fx-padding: 5; -fx-background-insets: 0; -fx-background-radius: 0;");
     }
 
     private boolean connectToServer() {
@@ -374,12 +420,21 @@ public class Main extends Application {
                         Platform.runLater(() -> handle(d));
                     }
                 } catch (Exception e) {}
+                finally {
+                    Platform.runLater(() -> {
+                        usersList.getItems().clear();
+                        if (loginStage != null && loginStage.isShowing()) loginStage.close();
+                    });
+                    startConnectionThread();
+                }
             }).start();
             return true;
         } catch (Exception e) { return false; }
     }
 
     private void showLoginWindow(Stage owner) {
+        if (loginStage != null && loginStage.isShowing()) return;
+
         loginStage = new Stage();
         loginStage.initModality(Modality.APPLICATION_MODAL);
         loginStage.initOwner(owner);
@@ -404,6 +459,11 @@ public class Main extends Application {
 
         layout.getChildren().addAll(new Label("CODINOME:"), nf, b);
         loginStage.setScene(new Scene(layout, 300, 150));
+
+        loginStage.setOnCloseRequest(ev -> {
+            try { if (socket != null) socket.close(); } catch(Exception ex){}
+        });
+
         loginStage.show();
     }
 

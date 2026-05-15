@@ -1,6 +1,5 @@
 package org.example;
 
-
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -17,13 +16,20 @@ public class ChatServer {
     private static final Set<String> adminIPs = ConcurrentHashMap.newKeySet();
     private static final Map<String, Long> lastFahTime = new ConcurrentHashMap<>();
 
+    private static final Map<String, Long> lastFxTime = new ConcurrentHashMap<>();
+    private static final long FX_COOLDOWN_MS = 5000;
+
+    private static final Map<String, String> serverSounds = new ConcurrentHashMap<>();
+
     private static final String BANS_FILE = "bans.txt";
     private static final String ADMINS_FILE = "admins.txt";
+    private static final String SOUNDS_FILE = "server_sounds.txt";
 
     public static void main(String[] args) {
         loadConfig();
         loadList(BANS_FILE, banList);
         loadList(ADMINS_FILE, adminIPs);
+        loadServerSounds();
 
         new Thread(ChatServer::listenConsole).start();
         try (ServerSocket server = new ServerSocket(PORT)) {
@@ -68,6 +74,53 @@ public class ChatServer {
         } catch (IOException e) { System.out.println("[!] Erro ao salvar " + fileName); }
     }
 
+    private static void loadServerSounds() {
+        File f = new File(SOUNDS_FILE);
+        if (!f.exists()) {
+            try (PrintWriter writer = new PrintWriter(new FileWriter(f))) {
+                writer.println("JOIN=sounds/join.mp3");
+                writer.println("LEAVE=sounds/leave.mp3");
+                writer.println("MAINFRAME=sounds/mainframe.mp3");
+                writer.println("MSG=sounds/msg.mp3");
+                writer.println("FAH=sounds/fah.mp3");
+            } catch (IOException e) {}
+        }
+        try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+            String line;
+            serverSounds.clear();
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] parts = line.split("=", 2);
+                if (parts.length == 2) {
+                    serverSounds.put(parts[0].trim().toUpperCase(), parts[1].trim());
+                }
+            }
+            System.out.println("[SISTEMA] " + serverSounds.size() + " mapeamentos de áudio carregados.");
+        } catch (Exception e) {
+            System.out.println("[!] Erro ao carregar mapeamentos de som no servidor.");
+        }
+    }
+
+    private static synchronized void saveServerSounds() {
+        try (PrintWriter pw = new PrintWriter(new FileWriter(SOUNDS_FILE))) {
+            for (Map.Entry<String, String> entry : serverSounds.entrySet()) {
+                pw.println(entry.getKey() + "=" + entry.getValue());
+            }
+        } catch (IOException e) {
+            System.out.println("[!] Erro ao salvar lista de sons.");
+        }
+    }
+
+    private static String buildSoundSyncPayload() {
+        StringBuilder sb = new StringBuilder("SOUND_SYNC|");
+        for (Map.Entry<String, String> entry : serverSounds.entrySet()) {
+            sb.append(entry.getKey()).append("=").append(entry.getValue()).append(";");
+        }
+        if (sb.length() > 11) sb.setLength(sb.length() - 1);
+        return sb.toString();
+    }
+
     private static void listenConsole() {
         Scanner sc = new Scanner(System.in);
         while (sc.hasNextLine()) {
@@ -88,6 +141,32 @@ public class ChatServer {
         String target = parts.length > 1 ? parts[1].trim() : "";
 
         switch (cmd) {
+            // ADICIONADO: Sistema nativo de reinicialização agendada via console do servidor
+            case "restart":
+                int delaySeconds = 5;
+                if (!target.isEmpty()) {
+                    try { delaySeconds = Integer.parseInt(target); } catch(Exception e) {}
+                }
+                final int totalTempo = delaySeconds;
+                new Thread(() -> {
+                    try {
+                        for (int i = totalTempo; i > 0; i--) {
+                            broadcast("SYS|[ALERTA] O mainframe do servidor será REINICIADO em " + i + " segundos...");
+                            System.out.println("[RESTART] Reiniciando em " + i + "s...");
+                            Thread.sleep(1000);
+                        }
+                        broadcast("SYS|[MAINFRAME] Desconectando link de segurança. Reiniciando...");
+                        System.out.println("[SISTEMA] Encerrando processos e reiniciando mainframe.");
+
+                        // Desconecta de forma limpa todos os terminais ativos
+                        for (ClientHandler c : clients.values()) {
+                            c.disconnect("MAINFRAME REINICIANDO PARA ATUALIZAÇÃO.");
+                        }
+                        Thread.sleep(500);
+                        System.exit(0); // Fecha o processo principal
+                    } catch (Exception ex) {}
+                }).start();
+                break;
             case "list":
                 System.out.println("[LOG] Usuários: " + clients.keySet());
                 break;
@@ -139,7 +218,7 @@ public class ChatServer {
                 }
                 break;
             default:
-                if (isServerConsole) System.out.println("[?] list, admin, deadmin, kick, mute, ban [nome], unban [ip], /say");
+                if (isServerConsole) System.out.println("[?] restart [tempo_s], list, admin, deadmin, kick, mute, ban [nome], unban [ip], /say");
         }
     }
 
@@ -204,13 +283,130 @@ public class ChatServer {
 
                         updateUsers();
                         broadcast("SYS|[+] " + name + (isAdmin ? " (AGENTE)" : ""));
-                        //broadcast("AUDIO|JOIN");
+                        send(buildSoundSyncPayload());
                         System.out.println("[CONN] " + name + " via " + ip);
                     }
                     else if (dec.startsWith("/")) {
                         String[] parts = dec.split(" ", 2);
                         String cmdOriginal = parts[0].substring(1);
                         String cmdLower = cmdOriginal.toLowerCase();
+
+                        if (cmdLower.equals("mainframe")) {
+                            send("SYS|Acesso negado: /mainframe é um comando exclusivo do console nativo.");
+                            continue;
+                        }
+
+                        // Mapeia novos efeitos sonoros
+                        if (cmdLower.equals("addsound")) {
+                            if (!isAdmin) {
+                                send("SYS|Acesso negado: Apenas Agentes do Sistema podem cadastrar novos efeitos.");
+                                continue;
+                            }
+                            if (parts.length > 1) {
+                                String[] argsSound = parts[1].trim().split(" ", 2);
+                                if (argsSound.length == 2) {
+                                    String novaChave = argsSound[0].trim().toUpperCase();
+                                    String novaUrl = argsSound[1].trim();
+
+                                    serverSounds.put(novaChave, novaUrl);
+                                    saveServerSounds();
+
+                                    broadcast("SYS|[NOVO SOM] O Agente " + name + " mapeou o comando /fx " + novaChave.toLowerCase());
+                                    broadcast(buildSoundSyncPayload());
+                                } else {
+                                    send("SYS|Uso incorreto. Exemplo: /addsound NOME https://link.com/audio.mp3");
+                                }
+                            } else {
+                                send("SYS|Uso incorreto. Exemplo: /addsound NOME https://link.com/audio.mp3");
+                            }
+                            continue;
+                        }
+
+                        // ADICIONADO: /editfx [nome] [nova_url] para atualizar sons
+                        if (cmdLower.equals("editfx")) {
+                            if (!isAdmin) {
+                                send("SYS|Acesso negado: Apenas Agentes do Sistema podem alterar efeitos.");
+                                continue;
+                            }
+                            if (parts.length > 1) {
+                                String[] argsEdit = parts[1].trim().split(" ", 2);
+                                if (argsEdit.length == 2) {
+                                    String chave = argsEdit[0].trim().toUpperCase();
+                                    String novaUrl = argsEdit[1].trim();
+
+                                    if (serverSounds.containsKey(chave)) {
+                                        serverSounds.put(chave, novaUrl);
+                                        saveServerSounds();
+                                        broadcast("SYS|[SOMS MODIFICADO] O Agente " + name + " alterou o arquivo de /fx " + chave.toLowerCase());
+                                        broadcast(buildSoundSyncPayload());
+                                    } else {
+                                        send("SYS|Efeito '" + chave.toLowerCase() + "' não existe para ser editado. Use /addsound.");
+                                    }
+                                } else send("SYS|Uso correto: /editfx NOME NOVA_URL");
+                            } else send("SYS|Uso correto: /editfx NOME NOVA_URL");
+                            continue;
+                        }
+
+                        // ADICIONADO: /delfx [nome] para apagar sons permanentemente
+                        if (cmdLower.equals("delfx")) {
+                            if (!isAdmin) {
+                                send("SYS|Acesso negado: Apenas Agentes do Sistema podem remover efeitos.");
+                                continue;
+                            }
+                            if (parts.length > 1) {
+                                String chaveDel = parts[1].trim().toUpperCase();
+                                if (serverSounds.containsKey(chaveDel)) {
+                                    serverSounds.remove(chaveDel);
+                                    saveServerSounds();
+                                    broadcast("SYS|[SOM DELETADO] O Agente " + name + " removeu o efeito /fx " + chaveDel.toLowerCase());
+                                    broadcast(buildSoundSyncPayload());
+                                } else {
+                                    send("SYS|Efeito /fx " + chaveDel.toLowerCase() + " não foi encontrado.");
+                                }
+                            } else send("SYS|Uso correto: /delfx NOME_DO_SOM");
+                            continue;
+                        }
+
+                        if (cmdLower.equals("fx")) {
+                            if (parts.length > 1) {
+                                String subCmd = parts[1].trim();
+                                String subCmdLower = subCmd.toLowerCase();
+
+                                if (subCmdLower.equals("lista")) {
+                                    if (serverSounds.isEmpty()) {
+                                        send("SYS|Nenhum efeito sonoro cadastrado no momento.");
+                                    } else {
+                                        List<String> sortedSounds = new ArrayList<>(serverSounds.keySet());
+                                        Collections.sort(sortedSounds);
+                                        send("SYS|======= EFEITOS DISPONÍVEIS ========");
+                                        for (String soundKey : sortedSounds) {
+                                            send("SYS| -> /fx " + soundKey.toLowerCase());
+                                        }
+                                        send("SYS|=====================================");
+                                    }
+                                    continue;
+                                }
+
+                                long now = System.currentTimeMillis();
+                                if (now - lastFxTime.getOrDefault(name, 0L) < FX_COOLDOWN_MS) {
+                                    long restando = (FX_COOLDOWN_MS - (now - lastFxTime.get(name))) / 1000;
+                                    send("SYS|Anti-Spam FX: Aguarde " + (restando <= 0 ? 1 : restando) + "s para usar o /fx novamente.");
+                                    continue;
+                                }
+
+                                String chaveCaixaAlta = subCmd.toUpperCase();
+                                if (serverSounds.containsKey(chaveCaixaAlta)) {
+                                    lastFxTime.put(name, now);
+                                    broadcast("SYS| * " + name + " usou o efeito: /fx " + subCmdLower);
+                                    broadcast("AUDIO|" + chaveCaixaAlta);
+                                } else {
+                                    send("SYS|Efeito /fx " + subCmdLower + " não encontrado. Digite /fx lista para ver as opções.");
+                                }
+                            } else {
+                                send("SYS|Uso correto: /fx [nome_do_som] ou digite /fx lista");
+                            }
+                            continue;
+                        }
 
                         if (cmdLower.startsWith("fah")) {
                             long now = System.currentTimeMillis();
@@ -231,13 +427,14 @@ public class ChatServer {
                             continue;
                         }
 
+                        // MODIFICADO: Lista de ajuda atualizada com informações detalhadas e novos comandos
                         if (cmdLower.equals("help") || cmdLower.equals("ajuda")) {
-                            send("SYS|COMANDOS AGENTE: /kick, /mute, /ban, /list, /unban [ip]");
-                            send("SYS|COMANDOS GERAIS: /fah [nome], /som (liga/desliga efeitos sonoros), /[qualquer_som_do_txt]");
+                            send("SYS|COMANDOS AGENTE: /kick, /mute, /ban, /list, /unban [ip], /addsound [chave] [url], /editfx [chave] [url], /delfx [chave]");
+                            send("SYS|COMANDOS GERAIS: /fah [nome], /som ou /notif (muda som local), /clean (limpa tela), /fx lista, /fx [nome]");
+                            send("SYS|MENSAGEM PRIVADA: /[nome_do_usuario] [sua_mensagem_aqui]");
                             continue;
                         }
 
-                        // Se o comando for o nome de um usuário online (mensagem privada)
                         if (clients.containsKey(cmdOriginal)) {
                             if (parts.length > 1) {
                                 clients.get(cmdOriginal).send("PV|" + name + "|" + parts[1]);
@@ -248,19 +445,12 @@ public class ChatServer {
                             continue;
                         }
 
-                        // Se for um comando de administração rodado por um Agente
                         if (isAdmin && (cmdLower.equals("kick") || cmdLower.equals("mute") || cmdLower.equals("ban") || cmdLower.equals("unban") || cmdLower.equals("admin") || cmdLower.equals("deadmin") || cmdLower.equals("list"))) {
                             processCommand(name, dec, false);
                             continue;
                         }
 
-                        // ============================================================
-                        // GATILHO 100% DINÂMICO PARA OS SONS DO SEU ARQUIVO TXT
-                        // ============================================================
-                        // Qualquer coisa que não caiu nas regras acima vira um comando de som!
-                        // O servidor avisa o chat e dispara a reprodução da chave em CAIXA ALTA.
-                        broadcast("SYS| * " + name + " usou o efeito: /" + cmdLower);
-                        broadcast("AUDIO|" + cmdOriginal.toUpperCase());
+                        send("SYS|Comando /" + cmdLower + " desconhecido. Digite /ajuda para ver comandos válidos.");
                     }
                     else if (dec.startsWith("MSG|")) {
                         long now = System.currentTimeMillis();
@@ -282,7 +472,6 @@ public class ChatServer {
                     clients.remove(name);
                     updateUsers();
                     broadcast("SYS|[-] " + name);
-                    //broadcast("AUDIO|LEAVE");
                 }
             }
         }
