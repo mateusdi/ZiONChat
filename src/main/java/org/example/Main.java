@@ -377,7 +377,7 @@ public class Main extends Application {
             if (m.contains("[+]")) playAlertSound("JOIN");
             else if (m.contains("[-]")) playAlertSound("LEAVE");
                 // GATILHO ADICIONADO AQUI: Toca o alarme sempre que houver [MAINFRAME] ou [ALERTA] do /restart
-            else if (m.contains("[MAINFRAME]") ) playAlertSound("MAINFRAME");
+            else if (m.contains("[MAINFRAME]") || m.contains("[ALERTA]")) playAlertSound("MAINFRAME");
         }
     }
 
