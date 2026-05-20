@@ -1,5 +1,4 @@
-package org.example;
-import java.io.*;
+package org.example.ChatServer;import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,10 +18,13 @@ public class ChatServer {
     private static final long FX_COOLDOWN_MS = 5000;
 
     private static final Map<String, String> serverSounds = new ConcurrentHashMap<>();
+    private static final Map<String, Long> lastShakeTime = new ConcurrentHashMap<>();
 
     private static final String BANS_FILE = "bans.txt";
     private static final String ADMINS_FILE = "admins.txt";
     private static final String SOUNDS_FILE = "server_sounds.txt";
+
+    private static final List<PPTGame> games = Collections.synchronizedList(new ArrayList<>());
 
     public static void main(String[] args) {
         loadConfig();
@@ -426,10 +428,69 @@ public class ChatServer {
                             continue;
                         }
 
+                        if (cmdLower.equals("tremer")) {
+
+                            if (parts.length <= 1) {
+                                send("SYS|Uso correto: /tremer nome_do_usuario");
+                                continue;
+                            }
+
+                            String alvo = parts[1].trim();
+
+                            if (!clients.containsKey(alvo)) {
+                                send("SYS|Usuário não encontrado.");
+                                continue;
+                            }
+
+                            ClientHandler targetClient = clients.get(alvo);
+
+                            long now = System.currentTimeMillis();
+
+                            if (now - lastShakeTime.getOrDefault(name, 0L) < 5000) {
+                                send("SYS|Aguarde 5s para usar /tremer novamente.");
+                                continue;
+                            }
+
+                            lastShakeTime.put(name, now);
+
+                            targetClient.send("FX|SHAKE");
+
+                            send("SYS|Você fez a tela de " + alvo + " tremer.");
+
+                            if (!alvo.equals(name)) {
+                                targetClient.send("SYS|[EFEITO] " + name + " fez sua tela tremer.");
+                            }
+
+                            continue;
+                        }
+
+                        if (cmdLower.equals("ppt")) {
+
+                            if (parts.length <= 1) {
+                                send("SYS|Uso: /ppt usuario");
+                                continue;
+                            }
+
+                            String alvo = parts[1].trim();
+
+                            if (!clients.containsKey(alvo)) {
+                                send("SYS|Usuário não encontrado.");
+                                continue;
+                            }
+
+                            clients.get(alvo)
+                                    .send("PPT_INVITE|" + name);
+
+                            send("SYS|Convite enviado.");
+
+                            continue;
+                        }
+
                         // MODIFICADO: Lista de ajuda atualizada com informações detalhadas e novos comandos
                         if (cmdLower.equals("help") || cmdLower.equals("ajuda")) {
                             send("SYS|COMANDOS AGENTE: /kick, /mute, /ban, /list, /unban [ip], /addsound [chave] [url], /editfx [chave] [url], /delfx [chave]");
-                            send("SYS|COMANDOS GERAIS: /fah [nome], /som ou /notif (muda som local), /clean (limpa tela), /fx lista, /fx [nome]");
+                            send("SYS|COMANDOS GERAIS: /fah [nome], /som ou /notif (muda som local), /clean (limpa tela), /fx lista, /fx [nome]" +
+                                    " /tremer [usuario], /ppt [usuario] (desafia para pedra, papel e tesoura)");
                             send("SYS|MENSAGEM PRIVADA: /[nome_do_usuario] [sua_mensagem_aqui]");
                             continue;
                         }
@@ -464,6 +525,54 @@ public class ChatServer {
                             send("SYS|Você está em silêncio.");
                         }
                     }
+
+                    else if (dec.startsWith("PPT_ACCEPT|")) {
+
+                        String challenger = dec.substring(11);
+
+                        PPTGame game =
+                                new PPTGame(challenger, name);
+
+                        games.add(game);
+
+                        clients.get(challenger)
+                                .send("PPT_START|" + name);
+
+                        send("PPT_START|" + challenger);
+
+                        continue;
+                    }
+
+                    else if (dec.startsWith("PPT_MOVE|")) {
+
+                        String move = dec.substring(9);
+
+                        PPTGame game = games.stream()
+                                .filter(g ->
+                                        g.player1.equals(name)
+                                                || g.player2.equals(name))
+                                .findFirst()
+                                .orElse(null);
+
+                        if (game == null) {
+                            send("SYS|Partida não encontrada.");
+                            continue;
+                        }
+
+                        if (name.equals(game.player1)) {
+                            game.move1 = move;
+                        } else {
+                            game.move2 = move;
+                        }
+
+                        if (game.move1 != null &&
+                                game.move2 != null) {
+
+                            resolveGame(game);
+                        }
+
+                        continue;
+                    }
                 }
             } catch (Exception e) {
             } finally {
@@ -474,6 +583,45 @@ public class ChatServer {
                 }
             }
         }
+    }
+
+    private static void resolveGame(PPTGame game) {
+
+        String result1;
+        String result2;
+
+        if (game.move1.equals(game.move2)) {
+
+            result1 = "EMPATE";
+            result2 = "EMPATE";
+
+        } else if (
+                (game.move1.equals("pedra") &&
+                        game.move2.equals("tesoura")) ||
+
+                        (game.move1.equals("papel") &&
+                                game.move2.equals("pedra")) ||
+
+                        (game.move1.equals("tesoura") &&
+                                game.move2.equals("papel"))
+        ) {
+
+            result1 = "VOCÊ VENCEU";
+            result2 = "VOCÊ PERDEU";
+
+        } else {
+
+            result1 = "VOCÊ PERDEU";
+            result2 = "VOCÊ VENCEU";
+        }
+
+        clients.get(game.player1)
+                .send("PPT_RESULT|" + result1);
+
+        clients.get(game.player2)
+                .send("PPT_RESULT|" + result2);
+
+        games.remove(game);
     }
 
     static class MatrixCrypt {

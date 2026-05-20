@@ -379,6 +379,267 @@ public class Main extends Application {
                 // GATILHO ADICIONADO AQUI: Toca o alarme sempre que houver [MAINFRAME] ou [ALERTA] do /restart
             else if (m.contains("[MAINFRAME]") || m.contains("[ALERTA]")) playAlertSound("MAINFRAME");
         }
+        else if (m.startsWith("FX|")) {
+
+            String effect = m.substring(3);
+
+            switch (effect) {
+
+                case "SHAKE":
+                    playAlertSound("TREMER");
+                    shakeWindow();
+                    break;
+            }
+        }
+
+        else if (m.startsWith("PPT_INVITE|")) {
+
+            String challenger = m.substring(11);
+
+            showPPTInvite(challenger);
+        }
+
+        else if (m.startsWith("PPT_START|")) {
+
+            String opponent = m.substring(10);
+
+            openPPTGame(opponent);
+        }
+
+        else if (m.startsWith("PPT_RESULT|")) {
+
+            String result = m.substring(11);
+
+            showPopup("RESULTADO", result);
+        }
+    }
+
+
+
+
+    private void showPPTInvite(String challenger) {
+
+        Platform.runLater(() -> {
+
+            Stage inviteStage = new Stage();
+
+            inviteStage.setAlwaysOnTop(true);
+
+            VBox root = new VBox(20);
+
+            root.setAlignment(Pos.CENTER);
+
+            root.setPadding(new Insets(20));
+
+            root.setStyle(
+                    "-fx-background-color: black;" +
+                            "-fx-border-color: #00ff00;" +
+                            "-fx-border-width: 2;"
+            );
+
+            Label title = new Label(
+                    challenger + " desafiou você!"
+            );
+
+            title.setStyle(
+                    "-fx-text-fill: #00ff00;" +
+                            "-fx-font-size: 18;" +
+                            "-fx-font-family: Consolas;"
+            );
+
+            Button accept = new Button("ACEITAR");
+
+            Button decline = new Button("RECUSAR");
+
+            accept.setOnAction(e -> {
+
+                send("PPT_ACCEPT|" + challenger);
+
+                inviteStage.close();
+            });
+
+            decline.setOnAction(e -> {
+
+                send("PPT_DECLINE|" + challenger);
+
+                inviteStage.close();
+            });
+
+            HBox buttons = new HBox(15, accept, decline);
+
+            buttons.setAlignment(Pos.CENTER);
+
+            root.getChildren().addAll(
+                    title,
+                    buttons
+            );
+
+            Scene scene = new Scene(root, 350, 180);
+
+            inviteStage.setScene(scene);
+
+            inviteStage.setTitle("PEDRA PAPEL TESOURA");
+
+            inviteStage.show();
+        });
+    }
+
+    private void openPPTGame(String opponent) {
+
+        Platform.runLater(() -> {
+
+            Stage gameStage = new Stage();
+
+            VBox root = new VBox(20);
+
+            root.setAlignment(Pos.CENTER);
+
+            root.setPadding(new Insets(20));
+
+            root.setStyle(
+                    "-fx-background-color: black;" +
+                            "-fx-border-color: #00ff00;"
+            );
+
+            Label title = new Label(
+                    "PARTIDA CONTRA " + opponent
+            );
+
+            title.setStyle(
+                    "-fx-text-fill: #00ff00;" +
+                            "-fx-font-size: 20;"
+            );
+
+            Button pedra = new Button("🪨 PEDRA");
+
+            Button papel = new Button("📄 PAPEL");
+
+            Button tesoura = new Button("✂ TESOURA");
+
+            pedra.setOnAction(e -> {
+                send("PPT_MOVE|pedra");
+                gameStage.close();
+            });
+
+            papel.setOnAction(e -> {
+                send("PPT_MOVE|papel");
+                gameStage.close();
+            });
+
+            tesoura.setOnAction(e -> {
+                send("PPT_MOVE|tesoura");
+                gameStage.close();
+            });
+
+            VBox buttons = new VBox(
+                    10,
+                    pedra,
+                    papel,
+                    tesoura
+            );
+
+            buttons.setAlignment(Pos.CENTER);
+
+            root.getChildren().addAll(
+                    title,
+                    buttons
+            );
+
+            Scene scene =
+                    new Scene(root, 300, 300);
+
+            gameStage.setScene(scene);
+
+            gameStage.show();
+        });
+    }
+
+    private void showPopup(String from, String message) {
+
+        Platform.runLater(() -> {
+
+            Stage popup = new Stage();
+
+            popup.initOwner(mainStage);
+
+            popup.setAlwaysOnTop(true);
+
+            VBox root = new VBox(15);
+
+            root.setPadding(new Insets(20));
+
+            root.setAlignment(Pos.CENTER);
+
+            root.setStyle(
+                    "-fx-background-color: black;" +
+                            "-fx-border-color: #00ff00;" +
+                            "-fx-border-width: 2;"
+            );
+
+            Label title = new Label(from);
+
+            title.setStyle(
+                    "-fx-text-fill: #00ff00;" +
+                            "-fx-font-size: 18;" +
+                            "-fx-font-family: Consolas;"
+            );
+
+            Label text = new Label(message);
+
+            text.setWrapText(true);
+
+            text.setStyle(
+                    "-fx-text-fill: #ccffcc;" +
+                            "-fx-font-size: 15;" +
+                            "-fx-font-family: Consolas;"
+            );
+
+            Button ok = new Button("OK");
+
+            ok.setOnAction(e -> popup.close());
+
+            root.getChildren().addAll(title, text, ok);
+
+            Scene scene = new Scene(root, 350, 180);
+
+            popup.setScene(scene);
+
+            popup.setTitle("TRANSMISSÃO");
+
+            popup.show();
+        });
+    }
+
+    private void shakeWindow() {
+
+        double originalX = mainStage.getX();
+        double originalY = mainStage.getY();
+
+        new Thread(() -> {
+
+            try {
+
+                for (int i = 0; i < 30; i++) {
+
+                    double offsetX = (Math.random() * 20) - 10;
+                    double offsetY = (Math.random() * 20) - 10;
+
+                    Platform.runLater(() -> {
+                        mainStage.setX(originalX + offsetX);
+                        mainStage.setY(originalY + offsetY);
+                    });
+
+                    Thread.sleep(20);
+                }
+
+            } catch (Exception ignored) {}
+
+            Platform.runLater(() -> {
+                mainStage.setX(originalX);
+                mainStage.setY(originalY);
+            });
+
+        }).start();
     }
 
     private void drawMatrixEffect(GraphicsContext gc, double w, double h) {
