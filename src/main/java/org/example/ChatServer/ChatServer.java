@@ -1,4 +1,5 @@
-package org.example.ChatServer;import java.io.*;
+package org.example.ChatServer;
+import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +26,7 @@ public class ChatServer {
     private static final String SOUNDS_FILE = "server_sounds.txt";
 
     private static final List<PPTGame> games = Collections.synchronizedList(new ArrayList<>());
+    private static final List<PongGame> pongGames = Collections.synchronizedList(new ArrayList<>());
 
     public static void main(String[] args) {
         loadConfig();
@@ -464,6 +466,28 @@ public class ChatServer {
                             continue;
                         }
 
+                        if (cmdLower.equals("pong")) {
+
+                            if (parts.length <= 1) {
+                                send("SYS|Uso: /pong usuario");
+                                continue;
+                            }
+
+                            String alvo = parts[1].trim();
+
+                            if (!clients.containsKey(alvo)) {
+                                send("SYS|Usuário não encontrado.");
+                                continue;
+                            }
+
+                            clients.get(alvo)
+                                    .send("PONG_INVITE|" + name);
+
+                            send("SYS|Convite Pong enviado.");
+
+                            continue;
+                        }
+
                         if (cmdLower.equals("ppt")) {
 
                             if (parts.length <= 1) {
@@ -573,6 +597,78 @@ public class ChatServer {
 
                         continue;
                     }
+
+                    else if (dec.startsWith("PONG_ACCEPT|")) {
+
+                        String challenger = dec.substring(12);
+
+                        PongGame game =
+                                new PongGame(challenger, name);
+
+                        pongGames.add(game);
+
+                        clients.get(challenger)
+                                .send("PONG_START|" + name + "|LEFT");
+
+                        send("PONG_START|" + challenger + "|RIGHT");
+
+                        startPongLoop(game);
+
+                        continue;
+                    }
+
+                    else if (dec.startsWith("PONG_INPUT|")) {
+
+                        String[] p = dec.split("\\|");
+
+                        String dir = p[1];
+
+                        String action = p[2];
+
+                        PongGame game =
+                                pongGames.stream()
+                                        .filter(g ->
+                                                g.playerLeft.equals(name)
+                                                        || g.playerRight.equals(name))
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (game == null)
+                            continue;
+
+                        boolean pressed =
+                                action.equals("PRESS");
+
+                        boolean isLeft =
+                                name.equals(game.playerLeft);
+
+                        if (isLeft) {
+
+                            if (dir.equals("UP")) {
+
+                                game.leftUp = pressed;
+                            }
+
+                            if (dir.equals("DOWN")) {
+
+                                game.leftDown = pressed;
+                            }
+
+                        } else {
+
+                            if (dir.equals("UP")) {
+
+                                game.rightUp = pressed;
+                            }
+
+                            if (dir.equals("DOWN")) {
+
+                                game.rightDown = pressed;
+                            }
+                        }
+
+                        continue;
+                    }
                 }
             } catch (Exception e) {
             } finally {
@@ -583,6 +679,218 @@ public class ChatServer {
                 }
             }
         }
+    }
+
+    private static void startPongLoop(
+            PongGame game
+    ) {
+
+        new Thread(() -> {
+
+            long lastTime =
+                    System.nanoTime();
+
+            while (game.running) {
+
+                long now = System.nanoTime();
+
+                double deltaTime = (now - lastTime) / 1_000_000_000.0;
+
+                lastTime = now;
+
+                game.deltaTime = deltaTime;
+
+                updateGame(game, deltaTime);
+
+                sendState(game);
+
+                try {
+
+                    Thread.sleep(16);
+
+                } catch(Exception e) {}
+            }
+
+        }).start();
+    }
+
+    private static void updateGame(PongGame g, double dt) {
+
+        // =========================
+        // MOVIMENTO DAS RAQUETES
+        // =========================
+
+        double paddleSpeed = 450;
+
+        // LEFT PLAYER
+        if (g.leftUp) {
+            g.leftY -= paddleSpeed * dt;
+        }
+
+        if (g.leftDown) {
+            g.leftY += paddleSpeed * dt;
+        }
+
+        // RIGHT PLAYER
+        if (g.rightUp) {
+            g.rightY -= paddleSpeed * dt;
+        }
+
+        if (g.rightDown) {
+            g.rightY += paddleSpeed * dt;
+        }
+
+        // =========================
+        // LIMITES DAS RAQUETES
+        // =========================
+
+        double maxY = 400;
+
+        if (g.leftY < 0) {
+            g.leftY = 0;
+        }
+
+        if (g.leftY > maxY) {
+            g.leftY = maxY;
+        }
+
+        if (g.rightY < 0) {
+            g.rightY = 0;
+        }
+
+        if (g.rightY > maxY) {
+            g.rightY = maxY;
+        }
+
+        // =========================
+        // MOVIMENTO DA BOLA
+        // =========================
+
+        g.ballX += g.ballVelX * dt;
+        g.ballY += g.ballVelY * dt;
+
+        // =========================
+        // COLISÃO TOPO/BAIXO
+        // =========================
+
+        if (g.ballY <= 0) {
+
+            g.ballY = 0;
+
+            g.ballVelY *= -1;
+        }
+
+        if (g.ballY >= 480) {
+
+            g.ballY = 480;
+
+            g.ballVelY *= -1;
+        }
+
+        // =========================
+        // COLISÃO ESQUERDA
+        // =========================
+
+        if (
+                g.ballX <= 30 &&
+                        g.ballX >= 10 &&
+                        g.ballY + 20 >= g.leftY &&
+                        g.ballY <= g.leftY + 100
+        ) {
+
+            g.ballX = 30;
+
+            g.ballVelX = Math.abs(g.ballVelX);
+
+            increaseBallSpeed(g);
+        }
+
+        // =========================
+        // COLISÃO DIREITA
+        // =========================
+
+        if (
+                g.ballX + 20 >= 770 &&
+                        g.ballX + 20 <= 790 &&
+                        g.ballY + 20 >= g.rightY &&
+                        g.ballY <= g.rightY + 100
+        ) {
+
+            g.ballX = 750;
+
+            g.ballVelX = -Math.abs(g.ballVelX);
+
+            increaseBallSpeed(g);
+        }
+
+        // =========================
+        // PONTO DIREITA
+        // =========================
+
+        if (g.ballX < -20) {
+
+            g.scoreRight++;
+
+            resetBall(g);
+
+            return;
+        }
+
+        // =========================
+        // PONTO ESQUERDA
+        // =========================
+
+        if (g.ballX > 820) {
+
+            g.scoreLeft++;
+
+            resetBall(g);
+
+            return;
+        }
+
+        // =========================
+        // VITÓRIA
+        // =========================
+
+        if (g.scoreLeft >= 5 || g.scoreRight >= 5) {
+
+            g.running = false;
+
+            String winner =
+                    g.scoreLeft >= 5
+                            ? g.playerLeft
+                            : g.playerRight;
+
+            if (clients.containsKey(g.playerLeft)) {
+                clients.get(g.playerLeft)
+                        .send("PONG_END|" + winner);
+            }
+
+            if (clients.containsKey(g.playerRight)) {
+                clients.get(g.playerRight)
+                        .send("PONG_END|" + winner);
+            }
+
+            pongGames.remove(g);
+        }
+    }
+
+    private static void increaseBallSpeed(PongGame g) {
+        g.ballVelX *= 1.05;
+        g.ballVelY *= 1.05;
+    }
+
+    private static void resetBall(PongGame g) {
+
+        g.ballX = 400;
+        g.ballY = 250;
+
+        double speed = 350;
+
+        g.ballVelX = Math.random() > 0.5 ? speed : -speed;
+
+        g.ballVelY = Math.random() > 0.5 ? speed : -speed;
     }
 
     private static void resolveGame(PPTGame game) {
@@ -622,6 +930,21 @@ public class ChatServer {
                 .send("PPT_RESULT|" + result2);
 
         games.remove(game);
+    }
+
+    private static void sendState(PongGame g) {
+
+        String state =
+                "PONG_STATE|"
+                        + g.ballX + "|"
+                        + g.ballY + "|"
+                        + g.leftY + "|"
+                        + g.rightY + "|"
+                        + g.scoreLeft + "|"
+                        + g.scoreRight;
+
+        clients.get(g.playerLeft).send(state);
+        clients.get(g.playerRight).send(state);
     }
 
     static class MatrixCrypt {

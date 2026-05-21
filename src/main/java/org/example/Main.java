@@ -58,6 +58,25 @@ public class Main extends Application {
 
     private MediaPlayer mediaPlayer;
 
+    private Stage pongStage;
+
+    private Canvas pongCanvas;
+
+    private GraphicsContext pongGc;
+
+    private double pongBallX = 400;
+    private double pongBallY = 250;
+
+    private double pongLeftY = 200;
+    private double pongRightY = 200;
+
+    private int pongScoreLeft = 0;
+    private int pongScoreRight = 0;
+
+    private String pongSide = "LEFT";
+
+    private AnimationTimer pongRenderLoop;
+
     @Override
     public void start(Stage stage) {
         this.mainStage = stage;
@@ -412,9 +431,304 @@ public class Main extends Application {
 
             showPopup("RESULTADO", result);
         }
+
+        else if (m.startsWith("PONG_INVITE|")) {
+
+            String challenger = m.substring(12);
+
+            showPongInvite(challenger);
+        }
+
+        else if (m.startsWith("PONG_START|")) {
+
+            String[] p = m.split("\\|");
+
+            String opponent = p[1];
+
+            String side = p[2];
+
+            openPongGame(opponent, side);
+        }
+
+        else if (m.startsWith("PONG_STATE|")) {
+
+            updatePongState(m);
+        }
+
+        else if (m.startsWith("PONG_END|")) {
+
+            String winner = m.substring(9);
+
+            Platform.runLater(() -> {
+
+                if (pongStage != null) {
+                    pongStage.close();
+                }
+
+                showPopup(
+                        "PONG",
+                        "Vencedor: " + winner
+                );
+            });
+        }
     }
 
+    // ============================
+// CONVITE PONG
+// ============================
 
+    private void showPongInvite(String challenger) {
+
+        Platform.runLater(() -> {
+
+            Stage inviteStage = new Stage();
+
+            inviteStage.setAlwaysOnTop(true);
+
+            VBox root = new VBox(20);
+
+            root.setAlignment(Pos.CENTER);
+
+            root.setPadding(new Insets(20));
+
+            root.setStyle(
+                    "-fx-background-color: black;" +
+                            "-fx-border-color: #00ff00;" +
+                            "-fx-border-width: 2;"
+            );
+
+            Label title = new Label(
+                    challenger + " desafiou você no PONG!"
+            );
+
+            title.setStyle(
+                    "-fx-text-fill: #00ff00;" +
+                            "-fx-font-size: 18;" +
+                            "-fx-font-family: Consolas;"
+            );
+
+            Button accept = new Button("ACEITAR");
+
+            Button decline = new Button("RECUSAR");
+
+            accept.setOnAction(e -> {
+
+                send("PONG_ACCEPT|" + challenger);
+
+                inviteStage.close();
+            });
+
+            decline.setOnAction(e -> {
+
+                inviteStage.close();
+            });
+
+            HBox buttons = new HBox(15, accept, decline);
+
+            buttons.setAlignment(Pos.CENTER);
+
+            root.getChildren().addAll(
+                    title,
+                    buttons
+            );
+
+            Scene scene = new Scene(root, 350, 180);
+
+            inviteStage.setScene(scene);
+
+            inviteStage.setTitle("PONG");
+
+            inviteStage.show();
+        });
+    }
+
+    // ============================
+// ABRIR JOGO
+// ============================
+
+    private void openPongGame(String opponent, String side) {
+
+        Platform.runLater(() -> {
+
+            pongSide = side;
+
+            pongStage = new Stage();
+
+            pongCanvas = new Canvas(800, 500);
+
+            pongGc = pongCanvas.getGraphicsContext2D();
+
+            StackPane root = new StackPane(pongCanvas);
+
+            root.setStyle("-fx-background-color: black;");
+
+            Scene scene =
+                    new Scene(root, 800, 500);
+
+            scene.setOnKeyPressed(e -> {
+
+                if (e.getCode() == KeyCode.UP) {
+                    send("PONG_INPUT|UP|PRESS");
+                }
+
+                if (e.getCode() == KeyCode.DOWN) {
+                    send("PONG_INPUT|DOWN|PRESS");
+                }
+            });
+
+            scene.setOnKeyReleased(e -> {
+
+                if (e.getCode() == KeyCode.UP) {
+
+                    send("PONG_INPUT|UP|RELEASE");
+                }
+
+                if (e.getCode() == KeyCode.DOWN) {
+
+                    send("PONG_INPUT|DOWN|RELEASE");
+                }
+            });
+
+            pongRenderLoop = new AnimationTimer() {
+
+                @Override
+                public void handle(long now) {
+
+                    renderPong();
+                }
+            };
+
+            pongRenderLoop.start();
+
+            pongStage.setScene(scene);
+
+            pongStage.setTitle(
+                    "PONG VS " + opponent
+            );
+
+            pongStage.setOnCloseRequest(e -> {
+
+                if (pongRenderLoop != null) {
+                    pongRenderLoop.stop();
+                }
+            });
+
+            pongStage.show();
+        });
+    }
+
+    // ============================
+// RECEBER ESTADO DO SERVIDOR
+// ============================
+
+    private void updatePongState(String m) {
+
+        String[] p = m.split("\\|");
+
+        pongBallX =
+                Double.parseDouble(p[1]);
+
+        pongBallY =
+                Double.parseDouble(p[2]);
+
+        pongLeftY =
+                Double.parseDouble(p[3]);
+
+        pongRightY =
+                Double.parseDouble(p[4]);
+
+        pongScoreLeft =
+                Integer.parseInt(p[5]);
+
+        pongScoreRight =
+                Integer.parseInt(p[6]);
+    }
+
+    // ============================
+// RENDER DO JOGO
+// ============================
+
+    private void renderPong() {
+
+        if (pongGc == null)
+            return;
+
+        pongGc.setFill(Color.BLACK);
+
+        pongGc.fillRect(
+                0,
+                0,
+                800,
+                500
+        );
+
+        pongGc.setFill(Color.LIME);
+
+        // linha central
+        for (int i = 0; i < 500; i += 30) {
+
+            pongGc.fillRect(
+                    395,
+                    i,
+                    10,
+                    20
+            );
+        }
+
+        // raquete esquerda
+        pongGc.fillRect(
+                10,
+                pongLeftY,
+                20,
+                100
+        );
+
+        // raquete direita
+        pongGc.fillRect(
+                770,
+                pongRightY,
+                20,
+                100
+        );
+
+        // bola
+        pongGc.fillOval(
+                pongBallX,
+                pongBallY,
+                20,
+                20
+        );
+
+        // placar
+        pongGc.setFont(
+                Font.font(
+                        "Consolas",
+                        30
+                )
+        );
+
+        pongGc.fillText(
+                pongScoreLeft
+                        + "    "
+                        + pongScoreRight,
+                340,
+                40
+        );
+
+        // lado jogador
+        pongGc.setFont(
+                Font.font(
+                        "Consolas",
+                        16
+                )
+        );
+
+        pongGc.fillText(
+                "VOCÊ: " + pongSide,
+                20,
+                30
+        );
+    }
 
 
     private void showPPTInvite(String challenger) {
