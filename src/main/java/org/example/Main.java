@@ -1,6 +1,8 @@
 package org.example;
 
 import javafx.animation.AnimationTimer;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -18,6 +20,7 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -74,6 +77,8 @@ public class Main extends Application {
     private int pongScoreRight = 0;
 
     private String pongSide = "LEFT";
+
+    private Stage bombermanLobbyStage;
 
     private AnimationTimer pongRenderLoop;
 
@@ -471,6 +476,361 @@ public class Main extends Application {
                 );
             });
         }
+
+        else if (m.startsWith("BOMBERMAN_INVITE|")) {
+
+            String host = m.substring(17);
+
+            showBombermanInvite(host);
+        }
+
+        else if (m.startsWith("BOMBERMAN_LOBBY|")) {
+            updateBombermanLobby(m);
+        }
+
+        else if (m.startsWith("BOMBERMAN_STATE|")) {
+            openBombermanGame(m);
+        }
+
+    }
+
+    private void openBombermanGame(
+            String m
+    ) {
+
+        Platform.runLater(() -> {
+
+            if (bombermanLobbyStage != null) {
+
+                bombermanLobbyStage.close();
+            }
+
+            Stage stage =
+                    new Stage();
+
+            Canvas canvas =
+                    new Canvas(750, 650);
+
+            GraphicsContext gc =
+                    canvas.getGraphicsContext2D();
+
+            renderBomberman(gc, m);
+
+            StackPane root =
+                    new StackPane(canvas);
+
+            root.setStyle(
+                    "-fx-background-color: black;"
+            );
+
+            stage.setScene(
+                    new Scene(root)
+            );
+
+            stage.setTitle("BOMBERMAN");
+
+            stage.show();
+        });
+    }
+
+    private void renderBomberman(
+            GraphicsContext gc,
+            String m
+    ) {
+
+        gc.setFill(Color.BLACK);
+
+        gc.fillRect(0,0,750,650);
+
+        String[] players =
+                m.substring(17).split(";");
+
+        for (String player : players) {
+
+            if (player.isEmpty())
+                continue;
+
+            String[] p =
+                    player.split(",");
+
+            String color =
+                    p[1];
+
+            int x =
+                    Integer.parseInt(p[2]);
+
+            int y =
+                    Integer.parseInt(p[3]);
+
+            switch (color) {
+
+                case "RED":
+                    gc.setFill(Color.RED);
+                    break;
+
+                case "BLUE":
+                    gc.setFill(Color.BLUE);
+                    break;
+
+                case "YELLOW":
+                    gc.setFill(Color.YELLOW);
+                    break;
+
+                default:
+                    gc.setFill(Color.WHITE);
+            }
+
+            gc.fillRect(
+                    x * 50,
+                    y * 50,
+                    40,
+                    40
+            );
+
+            gc.setFill(Color.WHITE);
+
+            gc.fillOval(
+                    x * 50 + 10,
+                    y * 50 + 10,
+                    20,
+                    20
+            );
+        }
+    }
+
+    private void updateBombermanLobby(
+            String m
+    ) {
+
+        Platform.runLater(() -> {
+
+            if (bombermanLobbyStage == null) {
+
+                openBombermanLobby();
+            }
+        });
+    }
+
+    private void openBombermanLobby() {
+
+        bombermanLobbyStage =
+                new Stage();
+
+        VBox root =
+                new VBox(15);
+
+        root.setAlignment(Pos.CENTER);
+
+        root.setPadding(
+                new Insets(20)
+        );
+
+        root.setStyle(
+                "-fx-background-color: black;"
+        );
+
+        Label title =
+                new Label("BOMBERMAN");
+
+        title.setStyle(
+                "-fx-text-fill: #00ff00;"
+                        + "-fx-font-size: 28;"
+        );
+
+        Button white =
+                new Button("BRANCO");
+
+        Button red =
+                new Button("VERMELHO");
+
+        Button yellow =
+                new Button("AMARELO");
+
+        Button blue =
+                new Button("AZUL");
+
+        Button ready =
+                new Button("READY");
+
+        white.setOnAction(e ->
+                send("BOMBERMAN_COLOR|WHITE")
+        );
+
+        red.setOnAction(e ->
+                send("BOMBERMAN_COLOR|RED")
+        );
+
+        yellow.setOnAction(e ->
+                send("BOMBERMAN_COLOR|YELLOW")
+        );
+
+        blue.setOnAction(e ->
+                send("BOMBERMAN_COLOR|BLUE")
+        );
+
+        ready.setOnAction(e ->
+                send("BOMBERMAN_READY")
+        );
+
+        root.getChildren().addAll(
+                title,
+                white,
+                red,
+                yellow,
+                blue,
+                ready
+        );
+
+        Scene scene =
+                new Scene(
+                        root,
+                        400,
+                        500
+                );
+
+        bombermanLobbyStage.setScene(scene);
+
+        bombermanLobbyStage.show();
+    }
+
+    // ============================
+// POPUP CONVITE BOMBERMAN
+// ============================
+
+    private void showBombermanInvite(String host) {
+
+        Platform.runLater(() -> {
+
+            Stage stage = new Stage();
+
+            VBox root =
+                    new VBox(15);
+
+            root.setAlignment(Pos.CENTER);
+
+            root.setPadding(
+                    new Insets(20)
+            );
+
+            root.setStyle(
+                    "-fx-background-color: black;"
+                            + "-fx-border-color: #00ff00;"
+                            + "-fx-border-width: 2;"
+            );
+
+            Label title =
+                    new Label(
+                            host
+                                    + " iniciou um BOMBERMAN"
+                    );
+
+            title.setStyle(
+                    "-fx-text-fill: #00ff00;"
+                            + "-fx-font-size: 18;"
+            );
+
+            Label timerLabel =
+                    new Label("10");
+
+            timerLabel.setStyle(
+                    "-fx-text-fill: #ccffcc;"
+                            + "-fx-font-size: 32;"
+            );
+
+            Button accept =
+                    new Button("ACEITAR");
+
+            Button decline =
+                    new Button("RECUSAR");
+
+            final int[] seconds =
+                    {10};
+
+            Timeline timeline =
+                    new Timeline(
+                            new KeyFrame(
+                                    Duration.seconds(1),
+                                    e -> {
+
+                                        seconds[0]--;
+
+                                        timerLabel.setText(
+                                                String.valueOf(
+                                                        seconds[0]
+                                                )
+                                        );
+
+                                        if (seconds[0] <= 0) {
+
+                                            send(
+                                                    "BOMBERMAN_DECLINE|"
+                                                            + host
+                                            );
+
+                                            stage.close();
+                                        }
+                                    }
+                            )
+                    );
+
+            timeline.setCycleCount(10);
+
+            timeline.play();
+
+            accept.setOnAction(e -> {
+
+                timeline.stop();
+
+                send(
+                        "BOMBERMAN_ACCEPT|"
+                                + host
+                );
+
+                stage.close();
+            });
+
+            decline.setOnAction(e -> {
+
+                timeline.stop();
+
+                send(
+                        "BOMBERMAN_DECLINE|"
+                                + host
+                );
+
+                stage.close();
+            });
+
+            HBox buttons =
+                    new HBox(
+                            10,
+                            accept,
+                            decline
+                    );
+
+            buttons.setAlignment(
+                    Pos.CENTER
+            );
+
+            root.getChildren().addAll(
+                    title,
+                    timerLabel,
+                    buttons
+            );
+
+            Scene scene =
+                    new Scene(
+                            root,
+                            350,
+                            220
+                    );
+
+            stage.setScene(scene);
+
+            stage.setTitle("BOMBERMAN");
+
+            stage.show();
+        });
     }
 
     // ============================

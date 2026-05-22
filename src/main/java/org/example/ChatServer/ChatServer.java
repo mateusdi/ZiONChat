@@ -26,7 +26,11 @@ public class ChatServer {
     private static final String SOUNDS_FILE = "server_sounds.txt";
 
     private static final List<PPTGame> games = Collections.synchronizedList(new ArrayList<>());
+
     private static final List<PongGame> pongGames = Collections.synchronizedList(new ArrayList<>());
+
+    private static final List<BombermanLobby> bombermanLobbies = Collections.synchronizedList(new ArrayList<>());
+    private static final List<BombermanGame> bombermanGames = Collections.synchronizedList(new ArrayList<>());
 
     public static void main(String[] args) {
         loadConfig();
@@ -261,9 +265,9 @@ public class ChatServer {
 
                 if (banList.contains(ip)) { disconnect("IP BANIDO."); return; }
 
-                if (clients.values().stream().anyMatch(c -> c.socket.getInetAddress().getHostAddress().equals(ip))) {
-                    disconnect("DUPLICIDADE DE IP."); return;
-                }
+                //if (clients.values().stream().anyMatch(c -> c.socket.getInetAddress().getHostAddress().equals(ip))) {
+                //    disconnect("DUPLICIDADE DE IP."); return;
+                //}
 
                 String line;
                 while ((line = in.readLine()) != null) {
@@ -510,6 +514,57 @@ public class ChatServer {
                             continue;
                         }
 
+                        // ============================
+// /bomberman
+// ============================
+
+                        if (cmdLower.equals("bomberman")) {
+
+                            boolean alreadyHosting =
+                                    bombermanLobbies.stream()
+                                            .anyMatch(l ->
+                                                    l.host.equals(name)
+                                            );
+
+                            if (alreadyHosting) {
+
+                                send("SYS|Você já possui um lobby aberto.");
+
+                                continue;
+                            }
+
+                            BombermanLobby lobby =
+                                    new BombermanLobby(name);
+
+                            bombermanLobbies.add(lobby);
+
+                            int invitedCount = 0;
+
+                            for (String username : clients.keySet()) {
+
+                                if (username.equals(name))
+                                    continue;
+
+                                if (invitedCount >= 3)
+                                    break;
+
+                                lobby.invited.add(username);
+
+                                clients.get(username)
+                                        .send("BOMBERMAN_INVITE|" + name);
+
+                                invitedCount++;
+                            }
+
+                            send("SYS|Convites enviados para "
+                                    + invitedCount
+                                    + " jogadores.");
+
+                            startBombermanLobbyTimer(lobby);
+
+                            continue;
+                        }
+
                         // MODIFICADO: Lista de ajuda atualizada com informações detalhadas e novos comandos
                         if (cmdLower.equals("help") || cmdLower.equals("ajuda")) {
                             send("SYS|COMANDOS AGENTE: /kick, /mute, /ban, /list, /unban [ip], /addsound [chave] [url], /editfx [chave] [url], /delfx [chave]");
@@ -669,10 +724,184 @@ public class ChatServer {
 
                         continue;
                     }
+
+                    // ============================
+// ACEITAR
+// ============================
+
+                    else if (dec.startsWith("BOMBERMAN_ACCEPT|")) {
+
+                        String host =
+                                dec.split("\\|")[1];
+
+                        BombermanLobby lobby =
+                                bombermanLobbies.stream()
+                                        .filter(l ->
+                                                l.host.equals(host)
+                                        )
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (lobby == null) {
+
+                            send("SYS|Lobby não encontrado.");
+
+                            continue;
+                        }
+
+                        if (lobby.started) {
+
+                            send("SYS|Partida já iniciada.");
+
+                            continue;
+                        }
+
+                        if (!lobby.invited.contains(name)) {
+
+                            send("SYS|Você não foi convidado.");
+
+                            continue;
+                        }
+
+                        lobby.accepted.add(name);
+
+                        lobby.declined.remove(name);
+
+                        clients.get(host)
+                                .send("SYS|" + name + " entrou no BOMBERMAN.");
+
+                        checkBombermanLobby(lobby);
+
+                        continue;
+                    }
+
+                    // ============================
+// RECUSAR
+// ============================
+
+                    else if (dec.startsWith("BOMBERMAN_DECLINE|")) {
+
+                        String host =
+                                dec.split("\\|")[1];
+
+                        BombermanLobby lobby =
+                                bombermanLobbies.stream()
+                                        .filter(l ->
+                                                l.host.equals(host))
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (lobby == null)
+                            continue;
+
+                        lobby.declined.add(name);
+
+                        lobby.accepted.remove(name);
+
+                        checkBombermanLobby(lobby);
+
+                        continue;
+                    }
+
+                    else if (dec.startsWith("BOMBERMAN_COLOR|")) {
+
+                        String color =
+                                dec.split("\\|")[1];
+
+                        BombermanGame game =
+                                bombermanGames.stream()
+                                        .filter(g ->
+                                                g.players.stream()
+                                                        .anyMatch(p ->
+                                                                p.name.equals(name)
+                                                        )
+                                        )
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (game == null)
+                            continue;
+
+                        boolean alreadyUsed =
+                                game.players.stream()
+                                        .anyMatch(p ->
+                                                p.color.equals(color)
+                                        );
+
+                        if (alreadyUsed) {
+
+                            send("SYS|Cor já escolhida.");
+
+                            continue;
+                        }
+
+                        BombermanPlayer player =
+                                game.players.stream()
+                                        .filter(p ->
+                                                p.name.equals(name)
+                                        )
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (player == null)
+                            continue;
+
+                        player.color = color;
+
+                        sendBombermanLobbyState(game);
+
+                        continue;
+                    }
+
+                    else if (dec.startsWith("BOMBERMAN_READY")) {
+
+                        BombermanGame game =
+                                bombermanGames.stream()
+                                        .filter(g ->
+                                                g.players.stream()
+                                                        .anyMatch(p ->
+                                                                p.name.equals(name)
+                                                        )
+                                        )
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (game == null)
+                            continue;
+
+                        BombermanPlayer player =
+                                game.players.stream()
+                                        .filter(p ->
+                                                p.name.equals(name)
+                                        )
+                                        .findFirst()
+                                        .orElse(null);
+
+                        if (player == null)
+                            continue;
+
+                        player.ready = !player.ready;
+
+                        sendBombermanLobbyState(game);
+
+                        boolean allReady =
+                                game.players.stream()
+                                        .allMatch(p ->
+                                                p.ready
+                                        );
+
+                        if (allReady) {
+
+                            startBombermanMatch(game);
+                        }
+
+                        continue;
+                    }
                 }
             } catch (Exception e) {
             } finally {
                 if (name != null) {
+                    removePlayerFromBomberman(name);
                     clients.remove(name);
                     updateUsers();
                     broadcast("SYS|[-] " + name);
@@ -680,6 +909,272 @@ public class ChatServer {
             }
         }
     }
+
+    private static void startBombermanMatch(
+            BombermanGame game
+    ) {
+
+        game.started = true;
+
+        int[][] spawn = {
+                {1,1},
+                {13,1},
+                {1,11},
+                {13,11}
+        };
+
+        for (int i = 0; i < game.players.size(); i++) {
+
+            game.players.get(i).x =
+                    spawn[i][0];
+
+            game.players.get(i).y =
+                    spawn[i][1];
+        }
+
+        sendBombermanState(game);
+    }
+
+    private static void sendBombermanState(
+            BombermanGame game
+    ) {
+
+        StringBuilder sb =
+                new StringBuilder(
+                        "BOMBERMAN_STATE|"
+                );
+
+        for (BombermanPlayer p : game.players) {
+
+            sb.append(p.name)
+                    .append(",")
+                    .append(p.color)
+                    .append(",")
+                    .append(p.x)
+                    .append(",")
+                    .append(p.y)
+                    .append(";");
+        }
+
+        String payload =
+                sb.toString();
+
+        for (BombermanPlayer p : game.players) {
+
+            if (clients.containsKey(p.name)) {
+
+                clients.get(p.name)
+                        .send(payload);
+            }
+        }
+    }
+
+    // ============================
+    // TIMER AUTOMÁTICO
+    // ============================
+
+    private static void startBombermanLobbyTimer(BombermanLobby lobby) {
+
+        new Thread(() -> {
+
+            try {
+
+                Thread.sleep(10_000);
+
+            } catch (Exception ignored) {}
+
+            if (lobby.started)
+                return;
+
+            for (String invited : lobby.invited) {
+
+                boolean respondeu =
+                        lobby.accepted.contains(invited)
+                                || lobby.declined.contains(invited);
+
+                if (!respondeu) {
+
+                    lobby.declined.add(invited);
+
+                    if (clients.containsKey(invited)) {
+
+                        clients.get(invited)
+                                .send("SYS|Convite expirado.");
+                    }
+                }
+            }
+
+            checkBombermanLobby(lobby);
+
+        }).start();
+    }
+
+    // ============================
+    // VERIFICAR INÍCIO
+    // ============================
+
+    private static void checkBombermanLobby(BombermanLobby lobby) {
+
+        int totalResponses = lobby.accepted.size() + lobby.declined.size();
+
+        if (totalResponses >= lobby.invited.size()) {
+
+            startBomberman(lobby);
+        }
+    }
+
+    // ============================
+    // INICIAR PARTIDA
+    // ============================
+
+    private static void startBomberman(
+            BombermanLobby lobby
+    ) {
+
+        if (lobby.started)
+            return;
+
+        lobby.started = true;
+
+        List<String> players =
+                new ArrayList<>();
+
+        players.add(lobby.host);
+
+        players.addAll(lobby.accepted);
+
+        if (players.size() < 2) {
+
+            if (clients.containsKey(lobby.host)) {
+
+                clients.get(lobby.host)
+                        .send("SYS|Partida cancelada.");
+            }
+
+            bombermanLobbies.remove(lobby);
+
+            return;
+        }
+
+        BombermanGame game =
+                new BombermanGame();
+
+        for (String p : players) {
+
+            game.players.add(
+                    new BombermanPlayer(p)
+            );
+        }
+
+        bombermanGames.add(game);
+
+        sendBombermanLobbyState(game);
+
+        bombermanLobbies.remove(lobby);
+    }
+
+    private static void sendBombermanLobbyState(
+            BombermanGame game
+    ) {
+
+        StringBuilder sb =
+                new StringBuilder(
+                        "BOMBERMAN_LOBBY|"
+                );
+
+        for (BombermanPlayer p : game.players) {
+
+            sb.append(p.name)
+                    .append(",")
+                    .append(p.color)
+                    .append(",")
+                    .append(p.ready)
+                    .append(";");
+        }
+
+        String payload =
+                sb.toString();
+
+        for (BombermanPlayer p : game.players) {
+
+            if (clients.containsKey(p.name)) {
+
+                clients.get(p.name)
+                        .send(payload);
+            }
+        }
+    }
+
+    // ============================
+    // STATUS DA SALA
+    // ============================
+
+    private static void broadcastBombermanStatus(BombermanLobby lobby) {
+
+        String msg =
+                "SYS|BOMBERMAN Lobby -> "
+                        + "Aceitos: "
+                        + lobby.accepted.size()
+                        + "/3 | "
+                        + "Recusados: "
+                        + lobby.declined.size();
+
+        if (clients.containsKey(lobby.host)) {
+
+            clients.get(lobby.host)
+                    .send(msg);
+        }
+
+        for (String p : lobby.accepted) {
+
+            if (clients.containsKey(p)) {
+
+                clients.get(p)
+                        .send(msg);
+            }
+        }
+    }
+
+    // ============================
+// LIMPEZA AO DESCONECTAR
+// ============================
+
+    private static void removePlayerFromBomberman(String player) {
+
+        List<BombermanLobby> toRemove =
+                new ArrayList<>();
+
+        for (BombermanLobby lobby : bombermanLobbies) {
+
+            if (lobby.host.equals(player)) {
+
+                for (String invited : lobby.invited) {
+
+                    if (clients.containsKey(invited)) {
+
+                        clients.get(invited)
+                                .send("SYS|Lobby encerrado.");
+                    }
+                }
+
+                toRemove.add(lobby);
+
+                continue;
+            }
+
+            if (lobby.accepted.contains(player)) {
+
+                lobby.accepted.remove(player);
+
+                lobby.declined.add(player);
+
+                checkBombermanLobby(lobby);
+            }
+        }
+
+        bombermanLobbies.removeAll(toRemove);
+    }
+
 
     private static void startPongLoop(
             PongGame game

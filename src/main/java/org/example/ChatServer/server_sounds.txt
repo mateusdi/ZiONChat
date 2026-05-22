@@ -1,0 +1,5 @@
+JOIN=sounds/join.mp3
+LEAVE=sounds/leave.mp3
+MAINFRAME=sounds/mainframe.mp3
+MSG=sounds/msg.mp3
+FAH=sounds/fah.mp3
